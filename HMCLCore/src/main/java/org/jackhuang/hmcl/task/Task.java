@@ -18,19 +18,18 @@
 package org.jackhuang.hmcl.task;
 
 import javafx.application.Platform;
-import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.ReadOnlyDoubleProperty;
-import javafx.beans.property.SimpleDoubleProperty;
+import javafx.beans.property.ReadOnlyDoubleWrapper;
+import javafx.beans.property.ReadOnlyStringProperty;
+import javafx.beans.property.ReadOnlyStringWrapper;
 import org.jackhuang.hmcl.event.EventManager;
-import org.jackhuang.hmcl.util.Result;
+import org.jackhuang.hmcl.util.InvocationDispatcher;
 import org.jackhuang.hmcl.util.function.ExceptionalConsumer;
 import org.jackhuang.hmcl.util.function.ExceptionalFunction;
 import org.jackhuang.hmcl.util.function.ExceptionalRunnable;
 import org.jackhuang.hmcl.util.function.ExceptionalSupplier;
 import org.jetbrains.annotations.Nullable;
 
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.VarHandle;
 import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
@@ -48,6 +47,8 @@ import static org.jackhuang.hmcl.util.logging.Logger.LOG;
  */
 public abstract class Task<T> {
 
+    private final EventManager<TaskEvent> onDone = new EventManager<>();
+
     /**
      * True if not logging when executing this task.
      */
@@ -63,9 +64,9 @@ public abstract class Task<T> {
     }
 
     // cancel
-    private BooleanSupplier cancelled;
+    private Supplier<Boolean> cancelled;
 
-    final void setCancelled(BooleanSupplier cancelled) {
+    final void setCancelled(Supplier<Boolean> cancelled) {
         this.cancelled = cancelled;
     }
 
@@ -75,7 +76,7 @@ public abstract class Task<T> {
             return true;
         }
 
-        return cancelled != null && cancelled.getAsBoolean();
+        return cancelled != null ? cancelled.get() : false;
     }
 
     // stage
@@ -91,7 +92,6 @@ public abstract class Task<T> {
 
     /**
      * You must initialize stage in constructor.
-     *
      * @param stage the stage
      */
     protected final void setStage(String stage) {
@@ -211,10 +211,10 @@ public abstract class Task<T> {
     }
 
     // name
-    private String name;
+    private String name = getClass().getName();
 
     public String getName() {
-        return name != null ? name : getClass().getName();
+        return name;
     }
 
     public Task<T> setName(String name) {
@@ -236,7 +236,7 @@ public abstract class Task<T> {
 
     /**
      * Returns the result of this task.
-     * <p>
+     *
      * The result will be generated only if the execution is completed.
      */
     public T getResult() {
@@ -270,8 +270,7 @@ public abstract class Task<T> {
      * @throws InterruptedException if current thread is interrupted
      * @see Thread#isInterrupted()
      */
-    public void preExecute() throws Exception {
-    }
+    public void preExecute() throws Exception {}
 
     /**
      * @throws InterruptedException if current thread is interrupted
@@ -285,7 +284,7 @@ public abstract class Task<T> {
 
     /**
      * This method will be called after dependency tasks terminated all together.
-     * <p>
+     *
      * You can check whether dependencies succeed in this method by calling
      * {@link Task#isDependenciesSucceeded()} no matter when
      * {@link Task#isRelyingOnDependencies()} returns true or false.
@@ -294,8 +293,7 @@ public abstract class Task<T> {
      * @see Thread#isInterrupted()
      * @see Task#isDependenciesSucceeded()
      */
-    public void postExecute() throws Exception {
-    }
+    public void postExecute() throws Exception {}
 
     /**
      * The collection of sub-tasks that should execute **before** this task running.
@@ -312,77 +310,49 @@ public abstract class Task<T> {
         return Collections.emptySet();
     }
 
-    private volatile EventManager<TaskEvent> onDone;
-
     public EventManager<TaskEvent> onDone() {
-        EventManager<TaskEvent> onDone = this.onDone;
-        if (onDone == null) {
-            synchronized (this) {
-                onDone = this.onDone;
-                if (onDone == null) {
-                    this.onDone = onDone = new EventManager<>();
-                }
-            }
-        }
-
         return onDone;
     }
 
-    void fireDoneEvent(Object source, boolean failed) {
-        EventManager<TaskEvent> onDone = this.onDone;
-        if (onDone != null)
-            onDone.fireEvent(new TaskEvent(source, this, failed));
+    protected long getProgressInterval() {
+        return 1000L;
     }
 
-    private final DoubleProperty progress = new SimpleDoubleProperty(this, "progress", -1);
+    private long lastTime = Long.MIN_VALUE;
+    private final ReadOnlyDoubleWrapper progress = new ReadOnlyDoubleWrapper(this, "progress", -1);
+    private final InvocationDispatcher<Double> progressUpdate = InvocationDispatcher.runOn(Platform::runLater, progress::set);
 
     public ReadOnlyDoubleProperty progressProperty() {
-        return progress;
+        return progress.getReadOnlyProperty();
     }
 
-    private long lastUpdateProgressTime = 0L;
-
-    protected void updateProgress(long count, long total) {
-        if (count < 0 || total < 0)
-            throw new IllegalArgumentException("Invalid count or total: count=" + count + ", total=" + total);
-
-        updateProgress(count < total ? (double) count / total : 1.0);
+    protected void updateProgress(long progress, long total) {
+        updateProgress(1.0 * progress / total);
     }
 
     protected void updateProgress(double progress) {
-        if (progress < 0 || progress > 1.0 || Double.isNaN(progress))
-            throw new IllegalArgumentException("Invalid progress: " + progress);
-
+        if (progress < 0 || progress > 1.0)
+            throw new IllegalArgumentException("Progress is must between 0 and 1.");
         long now = System.currentTimeMillis();
-        if (progress == 1.0 || now - lastUpdateProgressTime >= 1000L) {
+        if (lastTime == Long.MIN_VALUE || now - lastTime >= getProgressInterval()) {
             updateProgressImmediately(progress);
-            lastUpdateProgressTime = now;
+            lastTime = now;
         }
     }
-
-    //region Helpers for updateProgressImmediately
-
-    @SuppressWarnings("FieldMayBeFinal")
-    private volatile double pendingProgress = -1.0;
-
-    /// @see Task#pendingProgress
-    private static final VarHandle PENDING_PROGRESS_HANDLE;
-
-    static {
-        try {
-            PENDING_PROGRESS_HANDLE = MethodHandles.lookup()
-                    .findVarHandle(Task.class, "pendingProgress", double.class);
-        } catch (NoSuchFieldException | IllegalAccessException e) {
-            throw new ExceptionInInitializerError(e);
-        }
-    }
-    //endregion updateProgressImmediately
 
     protected void updateProgressImmediately(double progress) {
-        // assert progress >= 0 && progress <= 1.0;
-        if ((double) PENDING_PROGRESS_HANDLE.getAndSet(this, progress) == -1.0) {
-            Platform.runLater(() -> this.progress.set((double) PENDING_PROGRESS_HANDLE.getAndSet(this, -1.0)));
-        }
+        progressUpdate.accept(progress);
+    }
+
+    private final ReadOnlyStringWrapper message = new ReadOnlyStringWrapper(this, "message", null);
+    private final InvocationDispatcher<String> messageUpdate = InvocationDispatcher.runOn(Platform::runLater, message::set);
+
+    public final ReadOnlyStringProperty messageProperty() {
+        return message.getReadOnlyProperty();
+    }
+
+    protected final void updateMessage(String newMessage) {
+        messageUpdate.accept(newMessage);
     }
 
     public final T run() throws Exception {
@@ -394,14 +364,16 @@ public abstract class Task<T> {
         execute();
         for (Task<?> task : getDependencies())
             doSubTask(task);
-        fireDoneEvent(this, false);
+        onDone.fireEvent(new TaskEvent(this, this, false));
 
         return getResult();
     }
 
     private void doSubTask(Task<?> task) throws Exception {
+        message.bind(task.message);
         progress.bind(task.progress);
         task.run();
+        message.unbind();
         progress.unbind();
     }
 
@@ -435,7 +407,7 @@ public abstract class Task<T> {
      * normally, is executed using the default Executor, with this
      * task's result as the argument to the supplied function.
      *
-     * @param fn  the function to use to compute the value of the returned Task
+     * @param fn the function to use to compute the value of the returned Task
      * @param <U> the function's return type
      * @return the new Task
      */
@@ -449,8 +421,8 @@ public abstract class Task<T> {
      * task's result as the argument to the supplied function.
      *
      * @param executor the executor to use for asynchronous execution
-     * @param fn       the function to use to compute the value of the returned Task
-     * @param <U>      the function's return type
+     * @param fn the function to use to compute the value of the returned Task
+     * @param <U> the function's return type
      * @return the new Task
      */
     public <U, E extends Exception> Task<U> thenApplyAsync(Executor executor, ExceptionalFunction<T, U, E> fn) {
@@ -462,10 +434,10 @@ public abstract class Task<T> {
      * normally, is executed using the supplied Executor, with this
      * task's result as the argument to the supplied function.
      *
-     * @param name     the name of this new Task for displaying
+     * @param name the name of this new Task for displaying
      * @param executor the executor to use for asynchronous execution
-     * @param fn       the function to use to compute the value of the returned Task
-     * @param <U>      the function's return type
+     * @param fn the function to use to compute the value of the returned Task
+     * @param <U> the function's return type
      * @return the new Task
      */
     public <U, E extends Exception> Task<U> thenApplyAsync(String name, Executor executor, ExceptionalFunction<T, U, E> fn) {
@@ -478,7 +450,7 @@ public abstract class Task<T> {
      * task's result as the argument to the supplied action.
      *
      * @param action the action to perform before completing the
-     *               returned Task
+     * returned Task
      * @return the new Task
      */
     public <E extends Exception> Task<Void> thenAcceptAsync(ExceptionalConsumer<T, E> action) {
@@ -490,7 +462,7 @@ public abstract class Task<T> {
      * normally, is executed using the supplied Executor, with this
      * task's result as the argument to the supplied action.
      *
-     * @param action   the action to perform before completing the returned Task
+     * @param action the action to perform before completing the returned Task
      * @param executor the executor to use for asynchronous execution
      * @return the new Task
      */
@@ -503,8 +475,8 @@ public abstract class Task<T> {
      * normally, is executed using the supplied Executor, with this
      * task's result as the argument to the supplied action.
      *
-     * @param name     the name of this new Task for displaying
-     * @param action   the action to perform before completing the returned Task
+     * @param name the name of this new Task for displaying
+     * @param action the action to perform before completing the returned Task
      * @param executor the executor to use for asynchronous execution
      * @return the new Task
      */
@@ -520,7 +492,7 @@ public abstract class Task<T> {
      * normally, executes the given action using the default Executor.
      *
      * @param action the action to perform before completing the
-     *               returned Task
+     * returned Task
      * @return the new Task
      */
     public <E extends Exception> Task<Void> thenRunAsync(ExceptionalRunnable<E> action) {
@@ -531,8 +503,8 @@ public abstract class Task<T> {
      * Returns a new Task that, when this task completes
      * normally, executes the given action using the supplied Executor.
      *
-     * @param action   the action to perform before completing the
-     *                 returned Task
+     * @param action the action to perform before completing the
+     * returned Task
      * @param executor the executor to use for asynchronous execution
      * @return the new Task
      */
@@ -544,9 +516,9 @@ public abstract class Task<T> {
      * Returns a new Task that, when this task completes
      * normally, executes the given action using the supplied Executor.
      *
-     * @param name     the name of this new Task for displaying
-     * @param action   the action to perform before completing the
-     *                 returned Task
+     * @param name the name of this new Task for displaying
+     * @param action the action to perform before completing the
+     * returned Task
      * @param executor the executor to use for asynchronous execution
      * @return the new Task
      */
@@ -561,7 +533,7 @@ public abstract class Task<T> {
      * Returns a new Task that, when this task completes
      * normally, is executed using the default Executor.
      *
-     * @param fn  the function to use to compute the value of the returned Task
+     * @param fn the function to use to compute the value of the returned Task
      * @param <U> the function's return type
      * @return the new Task
      */
@@ -574,8 +546,8 @@ public abstract class Task<T> {
      * normally, is executed using the default Executor.
      *
      * @param name the name of this new Task for displaying
-     * @param fn   the function to use to compute the value of the returned Task
-     * @param <U>  the function's return type
+     * @param fn the function to use to compute the value of the returned Task
+     * @param <U> the function's return type
      * @return the new Task
      */
     public final <U> Task<U> thenSupplyAsync(String name, Callable<U> fn) {
@@ -587,7 +559,7 @@ public abstract class Task<T> {
      * normally, is executed.
      *
      * @param other the another Task
-     * @param <U>   the type of the returned Task's result
+     * @param <U> the type of the returned Task's result
      * @return the Task
      */
     public final <U> Task<U> thenComposeAsync(Task<U> other) {
@@ -598,7 +570,7 @@ public abstract class Task<T> {
      * Returns a new Task that, when this task completes
      * normally, is executed.
      *
-     * @param fn  the function returning a new Task
+     * @param fn the function returning a new Task
      * @param <U> the type of the returned Task's result
      * @return the Task
      */
@@ -610,9 +582,9 @@ public abstract class Task<T> {
      * Returns a new Task that, when this task completes
      * normally, is executed.
      *
-     * @param fn       the function returning a new Task
+     * @param fn the function returning a new Task
      * @param executor the executor to use for asynchronous execution
-     * @param <U>      the type of the returned Task's result
+     * @param <U> the type of the returned Task's result
      * @return the Task
      */
     public final <U> Task<U> thenComposeAsync(Executor executor, ExceptionalSupplier<Task<U>, ?> fn) {
@@ -624,7 +596,7 @@ public abstract class Task<T> {
      * normally, is executed with result of this task as the argument
      * to the supplied function.
      *
-     * @param fn  the function returning a new Task
+     * @param fn the function returning a new Task
      * @param <U> the type of the returned Task's result
      * @return the Task
      */
@@ -637,9 +609,9 @@ public abstract class Task<T> {
      * normally, is executed with result of this task as the argument
      * to the supplied function.
      *
-     * @param fn       the function returning a new Task
+     * @param fn the function returning a new Task
      * @param executor the executor to use for asynchronous execution
-     * @param <U>      the type of the returned Task's result
+     * @param <U> the type of the returned Task's result
      * @return the Task
      */
     public <U, E extends Exception> Task<U> thenComposeAsync(Executor executor, ExceptionalFunction<T, Task<U>, E> fn) {
@@ -659,7 +631,7 @@ public abstract class Task<T> {
      * normally, executes the given action using the default Executor.
      *
      * @param action the action to perform before completing the
-     *               returned Task
+     * returned Task
      * @return the new Task
      */
     public <E extends Exception> Task<Void> withRunAsync(ExceptionalRunnable<E> action) {
@@ -670,8 +642,8 @@ public abstract class Task<T> {
      * Returns a new Task that, when this task completes
      * normally, executes the given action using the supplied Executor.
      *
-     * @param action   the action to perform before completing the
-     *                 returned Task
+     * @param action the action to perform before completing the
+     * returned Task
      * @param executor the executor to use for asynchronous execution
      * @return the new Task
      */
@@ -683,9 +655,9 @@ public abstract class Task<T> {
      * Returns a new Task that, when this task completes
      * normally, executes the given action using the supplied Executor.
      *
-     * @param name     the name of this new Task for displaying
-     * @param action   the action to perform before completing the
-     *                 returned Task
+     * @param name the name of this new Task for displaying
+     * @param action the action to perform before completing the
+     * returned Task
      * @param executor the executor to use for asynchronous execution
      * @return the new Task
      */
@@ -723,7 +695,7 @@ public abstract class Task<T> {
      * encounters an exception, then the returned task exceptionally completes
      * with this exception unless this task also completed exceptionally.
      *
-     * @param action   the action to perform
+     * @param action the action to perform
      * @param executor the executor to use for asynchronous execution
      * @return the new Task
      */
@@ -778,37 +750,6 @@ public abstract class Task<T> {
      */
     public Task<Void> whenComplete(Executor executor, FinalizedCallbackWithResult<T> action) {
         return whenComplete(executor, (exception -> action.execute(getResult(), exception)));
-    }
-
-    public Task<Result<T>> wrapResult() {
-        return new Task<Result<T>>() {
-            {
-                setSignificance(TaskSignificance.MODERATE);
-            }
-
-            @Override
-            public void execute() throws Exception {
-                if (isDependentsSucceeded() != (Task.this.getException() == null))
-                    throw new AssertionError("When whenComplete succeeded, Task.exception must be null.", Task.this.getException());
-
-                if (isDependentsSucceeded()) {
-                    setResult(Result.success(Task.this.getResult()));
-                } else {
-                    setSignificance(TaskSignificance.MINOR);
-                    setResult(Result.failure(Task.this.getException()));
-                }
-            }
-
-            @Override
-            public Collection<Task<?>> getDependents() {
-                return Collections.singleton(Task.this);
-            }
-
-            @Override
-            public boolean isRelyingOnDependents() {
-                return false;
-            }
-        }.setExecutor(executor).setName(getCaller()).setSignificance(TaskSignificance.MODERATE);
     }
 
     /**
@@ -871,29 +812,15 @@ public abstract class Task<T> {
         return new FakeProgressTask(done, k).setExecutor(Schedulers.defaultScheduler()).setName(name).setSignificance(TaskSignificance.MAJOR);
     }
 
-    public record StagesHint(String stage, List<String> aliases) {
-        public StagesHint(String stage) {
-            this(stage, List.of());
-        }
-    }
-
-    public Task<T> withStagesHints(String... hints) {
-        return withStagesHints(Arrays.stream(hints).map(StagesHint::new).toList());
-    }
-
-    public Task<T> withStagesHints(StagesHint... hints) {
-        return new StagesHintTask(List.of(hints));
-    }
-
-    public Task<T> withStagesHints(List<StagesHint> hints) {
-        return new StagesHintTask(hints);
+    public Task<T> withStagesHint(List<String> stages) {
+        return new StagesHintTask(stages);
     }
 
     public class StagesHintTask extends Task<T> {
-        private final List<StagesHint> hints;
+        private final List<String> stages;
 
-        public StagesHintTask(List<StagesHint> hints) {
-            this.hints = hints;
+        public StagesHintTask(List<String> stages) {
+            this.stages = stages;
         }
 
         @Override
@@ -906,8 +833,8 @@ public abstract class Task<T> {
             setResult(Task.this.getResult());
         }
 
-        public List<StagesHint> getHints() {
-            return hints;
+        public List<String> getStages() {
+            return stages;
         }
     }
 
@@ -1072,12 +999,10 @@ public abstract class Task<T> {
         FAILED
     }
 
-    @FunctionalInterface
     public interface FinalizedCallback {
         void execute(Exception exception) throws Exception;
     }
 
-    @FunctionalInterface
     public interface FinalizedCallbackWithResult<T> {
         void execute(T result, Exception exception) throws Exception;
     }
@@ -1143,7 +1068,7 @@ public abstract class Task<T> {
         /**
          * A task that combines two tasks and make sure pred runs before succ.
          *
-         * @param fn                  a callback that returns the task runs after pred, succ will be executed asynchronously. You can do something that relies on the result of pred.
+         * @param fn a callback that returns the task runs after pred, succ will be executed asynchronously. You can do something that relies on the result of pred.
          * @param relyingOnDependents true if this task chain will be broken when task pred fails.
          */
         UniCompose(ExceptionalSupplier<Task<U>, ?> fn, boolean relyingOnDependents) {
@@ -1153,7 +1078,7 @@ public abstract class Task<T> {
         /**
          * A task that combines two tasks and make sure pred runs before succ.
          *
-         * @param fn                  a callback that returns the task runs after pred, succ will be executed asynchronously. You can do something that relies on the result of pred.
+         * @param fn a callback that returns the task runs after pred, succ will be executed asynchronously. You can do something that relies on the result of pred.
          * @param relyingOnDependents true if this task chain will be broken when task pred fails.
          */
         UniCompose(ExceptionalFunction<T, Task<U>, ?> fn, boolean relyingOnDependents) {

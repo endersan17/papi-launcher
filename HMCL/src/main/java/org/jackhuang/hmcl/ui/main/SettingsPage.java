@@ -17,246 +17,167 @@
  */
 package org.jackhuang.hmcl.ui.main;
 
-import com.jfoenix.controls.JFXButton;
+import com.jfoenix.controls.JFXToggleButton;
+import javafx.application.Platform;
 import javafx.beans.InvalidationListener;
 import javafx.beans.WeakInvalidationListener;
+import javafx.beans.binding.Bindings;
 import javafx.beans.property.ObjectProperty;
-import javafx.beans.property.StringProperty;
-import javafx.css.PseudoClass;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;
-import javafx.scene.control.ScrollPane;
+import javafx.scene.control.ToggleGroup;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
+import javafx.stage.FileChooser;
 import org.jackhuang.hmcl.Metadata;
-import org.jackhuang.hmcl.task.Schedulers;
+import org.jackhuang.hmcl.setting.Settings;
+import org.jackhuang.hmcl.discord.DiscordRPCService;
 import org.jackhuang.hmcl.ui.Controllers;
 import org.jackhuang.hmcl.ui.FXUtils;
-import org.jackhuang.hmcl.ui.SVG;
-import org.jackhuang.hmcl.ui.construct.*;
+import org.jackhuang.hmcl.ui.construct.ComponentList;
 import org.jackhuang.hmcl.ui.construct.MessageDialogPane.MessageType;
 import org.jackhuang.hmcl.upgrade.RemoteVersion;
 import org.jackhuang.hmcl.upgrade.UpdateChannel;
 import org.jackhuang.hmcl.upgrade.UpdateChecker;
 import org.jackhuang.hmcl.upgrade.UpdateHandler;
-import org.jackhuang.hmcl.util.AprilFools;
-import org.jackhuang.hmcl.util.Lang;
 import org.jackhuang.hmcl.util.StringUtils;
-import org.jackhuang.hmcl.util.i18n.I18n;
-import org.jackhuang.hmcl.util.i18n.SupportedLocale;
+import org.jackhuang.hmcl.util.i18n.Locales;
 import org.jackhuang.hmcl.util.io.FileUtils;
-import org.jackhuang.hmcl.util.io.IOUtils;
 import org.tukaani.xz.XZInputStream;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.channels.Channels;
+import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
+import java.util.Optional;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
-import static org.jackhuang.hmcl.setting.SettingsManager.settings;
+import static org.jackhuang.hmcl.setting.ConfigHolder.config;
+import static org.jackhuang.hmcl.util.Lang.thread;
 import static org.jackhuang.hmcl.util.i18n.I18n.i18n;
+import static org.jackhuang.hmcl.util.javafx.ExtendedProperties.selectedItemPropertyFor;
 import static org.jackhuang.hmcl.util.logging.Logger.LOG;
 
-public final class SettingsPage extends ScrollPane {
-    @SuppressWarnings("FieldCanBeLocal")
-    private final InvalidationListener updateListener;
+public final class SettingsPage extends SettingsView {
+
+    private InvalidationListener updateListener;
 
     public SettingsPage() {
-        this.setFitToWidth(true);
+        FXUtils.smoothScrolling(scroll);
 
-        VBox rootPane = new VBox(10);
-        rootPane.setPadding(new Insets(10));
-        this.setContent(rootPane);
-        FXUtils.smoothScrolling(this);
+        // ==== Languages ====
+        cboLanguage.getItems().setAll(Locales.LOCALES);
+        selectedItemPropertyFor(cboLanguage).bindBidirectional(config().localizationProperty());
 
-        {
-            ComponentList updatePaneList = new ComponentList();
-            {
-                ObjectProperty<UpdateChannel> updateChannel;
-                {
+        // ====
 
-                    JFXButton updateButton = FXUtils.newToggleButton4(SVG.UPDATE, 20);
-                    updateButton.setOnAction(e -> onUpdate());
-                    updateButton.setPadding(Insets.EMPTY);
-                    FXUtils.installFastTooltip(updateButton, i18n("update.tooltip"));
-
-                    var updatePane = new LineSelectButton<UpdateChannel>() {
-
-                        {
-                            getStyleClass().add("update-pane");
-                            setNode(IDX_TRAILING, updateButton);
-                        }
-
-                        @Override
-                        protected int getTrailingTextIndex() {
-                            return LineComponent.IDX_TRAILING + 1;
-                        }
-                    };
-                    updateChannel = updatePane.valueProperty();
-                    updatePane.setTitle(i18n("update"));
-                    updatePane.setValue(UpdateChannel.getChannel());
-
-                    updatePane.setNullSafeConverter(channel -> i18n("update.channel." + channel.channelName));
-                    updatePane.setItems(List.of(UpdateChannel.STABLE, UpdateChannel.DEVELOPMENT));
-                    updatePane.setDescriptionConverter(channel -> i18n("update.note." + channel.channelName));
-
-                    final StringProperty lblUpdateSubProperty = updatePane.subtitleProperty();
-
-                    {
-                        updateListener = any -> {
-                            boolean outdated = UpdateChecker.isOutdated();
-
-                            updateButton.setVisible(outdated);
-                            updateButton.setManaged(outdated);
-                            updatePane.pseudoClassStateChanged(PseudoClass.getPseudoClass("active"), outdated);
-
-                            if (UpdateChecker.isOutdated()) {
-                                lblUpdateSubProperty.set(i18n("update.newest_version", UpdateChecker.getLatestVersion().version()));
-                            } else if (UpdateChecker.isCheckingUpdate()) {
-                                lblUpdateSubProperty.set(i18n("update.checking"));
-                            } else {
-                                lblUpdateSubProperty.set(i18n("update.latest"));
-                            }
-                        };
-                        UpdateChecker.latestVersionProperty().addListener(new WeakInvalidationListener(updateListener));
-                        UpdateChecker.outdatedProperty().addListener(new WeakInvalidationListener(updateListener));
-                        UpdateChecker.checkingUpdateProperty().addListener(new WeakInvalidationListener(updateListener));
-                        updateListener.invalidated(null);
-                    }
-
-                    updatePaneList.getContent().add(updatePane);
-                }
-
-                {
-                    LineToggleButton previewPane = new LineToggleButton();
-                    previewPane.setTitle(i18n("update.preview"));
-                    previewPane.setSubtitle(i18n("update.preview.subtitle"));
-                    previewPane.selectedProperty().bindBidirectional(settings().acceptPreviewUpdateProperty());
-
-                    InvalidationListener checkUpdateListener = e -> {
-                        UpdateChecker.requestCheckUpdate(updateChannel.get(), previewPane.isSelected());
-                    };
-                    updateChannel.addListener(checkUpdateListener);
-                    previewPane.selectedProperty().addListener(checkUpdateListener);
-
-                    updatePaneList.getContent().add(previewPane);
-                }
-
-                {
-                    LineToggleButton disableAutoShowUpdateDialogPane = new LineToggleButton();
-                    disableAutoShowUpdateDialogPane.setTitle(i18n("update.disable_auto_show_update_dialog"));
-                    disableAutoShowUpdateDialogPane.setSubtitle(i18n("update.disable_auto_show_update_dialog.subtitle"));
-                    disableAutoShowUpdateDialogPane.selectedProperty().bindBidirectional(settings().disableAutoShowUpdateDialogProperty());
-                    updatePaneList.getContent().add(disableAutoShowUpdateDialogPane);
-                }
-
-                rootPane.getChildren().addAll(ComponentList.createComponentListTitle(i18n("update")), updatePaneList);
-            }
-
-            {
-                ComponentList languagePaneList = new ComponentList();
-
-                {
-                    var chooseLanguagePane = new LineSelectButton<SupportedLocale>();
-                    chooseLanguagePane.setTitle(i18n("settings.launcher.language"));
-                    chooseLanguagePane.setSubtitle(i18n("settings.take_effect_after_restart"));
-
-                    SupportedLocale currentLocale = I18n.getLocale();
-                    chooseLanguagePane.setNullSafeConverter(locale -> {
-                        if (locale.isDefault())
-                            return locale.getDisplayName(currentLocale);
-                        else if (locale.isSameLanguage(currentLocale))
-                            return locale.getDisplayName(locale);
-                        else
-                            return locale.getDisplayName(currentLocale) + " - " + locale.getDisplayName(locale);
-                    });
-                    chooseLanguagePane.setItems(SupportedLocale.getSupportedLocales());
-                    chooseLanguagePane.valueProperty().bindBidirectional(settings().languageProperty());
-
-                    languagePaneList.getContent().add(chooseLanguagePane);
-
-                }
-
-                rootPane.getChildren().addAll(ComponentList.createComponentListTitle(i18n("settings.launcher.language")), languagePaneList);
-            }
-
-            {
-                ComponentList miscPaneList = new ComponentList();
-
-                if (AprilFools.isShowAprilFoolsSettings()) {
-                    LineToggleButton disableAprilFools = new LineToggleButton();
-                    disableAprilFools.setTitle(i18n("settings.launcher.disable_april_fools"));
-                    disableAprilFools.setSubtitle(i18n("settings.take_effect_after_restart"));
-                    disableAprilFools.selectedProperty().bindBidirectional(settings().disableAprilFoolsProperty());
-                    miscPaneList.getContent().add(disableAprilFools);
-                }
-
-                {
-                    BorderPane debugPane = new BorderPane();
-
-                    Label left = new Label(i18n("settings.launcher.debug"));
-                    BorderPane.setAlignment(left, Pos.CENTER_LEFT);
-                    debugPane.setLeft(left);
-
-                    JFXButton openLogFolderButton = new JFXButton(i18n("settings.launcher.launcher_log.reveal"));
-                    openLogFolderButton.setOnAction(e -> openLogFolder());
-                    openLogFolderButton.getStyleClass().add("jfx-button-border");
-                    if (LOG.getLogFile() == null)
-                        openLogFolderButton.setDisable(true);
-
-                    SpinnerPane exportLogPane = new SpinnerPane();
-
-                    JFXButton logButton = FXUtils.newBorderButton(i18n("settings.launcher.launcher_log.export"));
-                    exportLogPane.setContent(logButton);
-                    logButton.setOnAction(e -> {
-                        exportLogPane.showSpinner();
-                        onExportLogs().whenCompleteAsync((result, exception) -> {
-                            exportLogPane.hideSpinner();
-                            if (exception == null) {
-                                Controllers.dialog(i18n("settings.launcher.launcher_log.export.success", result));
-                                FXUtils.showFileInExplorer(result);
-                            } else {
-                                LOG.warning("Failed to export logs", exception);
-                                Controllers.dialog(
-                                        i18n("settings.launcher.launcher_log.export.failed") + "\n" + StringUtils.getStackTrace(exception),
-                                        null,
-                                        MessageType.ERROR
-                                );
-                            }
-                        }, Schedulers.javafx());
-                    });
-
-                    HBox buttonBox = new HBox();
-                    buttonBox.setSpacing(10);
-                    buttonBox.getChildren().addAll(openLogFolderButton, exportLogPane);
-                    BorderPane.setAlignment(buttonBox, Pos.CENTER_RIGHT);
-                    debugPane.setRight(buttonBox);
-
-                    miscPaneList.getContent().add(debugPane);
-                }
-
-                rootPane.getChildren().addAll(ComponentList.createComponentListTitle(i18n("settings.launcher.misc")), miscPaneList);
-            }
+        if (disableAutoGameOptionsPane != null) {
+            disableAutoGameOptionsPane.selectedProperty().bindBidirectional(config().disableAutoGameOptionsProperty());
         }
+        // ====
+
+        setupDiscordRPCToggle();
+
+        if (fileCommonLocation != null) {
+            fileCommonLocation.selectedDataProperty().bindBidirectional(config().commonDirTypeProperty());
+        }
+        if (fileCommonLocationSublist != null) {
+            fileCommonLocationSublist.subtitleProperty().bind(
+                Bindings.createObjectBinding(() -> Optional.ofNullable(Settings.instance().getCommonDirectory())
+                                .orElse(i18n("launcher.cache_directory.disabled")),
+                        config().commonDirectoryProperty(), config().commonDirTypeProperty()));
+        }
+
+        // ==== Update ====
+        FXUtils.installFastTooltip(btnUpdate, i18n("update.tooltip"));
+        updateListener = any -> {
+            btnUpdate.setVisible(UpdateChecker.isOutdated());
+
+            if (UpdateChecker.isOutdated()) {
+                lblUpdateSub.setText(i18n("update.newest_version", UpdateChecker.getLatestVersion().getVersion()));
+                lblUpdateSub.getStyleClass().setAll("update-label");
+
+                lblUpdate.setText(i18n("update.found"));
+                lblUpdate.getStyleClass().setAll("update-label");
+            } else if (UpdateChecker.isCheckingUpdate()) {
+                lblUpdateSub.setText(i18n("update.checking"));
+                lblUpdateSub.getStyleClass().setAll("subtitle-label");
+
+                lblUpdate.setText(i18n("update"));
+                lblUpdate.getStyleClass().setAll();
+            } else {
+                lblUpdateSub.setText(i18n("update.latest"));
+                lblUpdateSub.getStyleClass().setAll("subtitle-label");
+
+                lblUpdate.setText(i18n("update"));
+                lblUpdate.getStyleClass().setAll();
+            }
+        };
+        UpdateChecker.latestVersionProperty().addListener(new WeakInvalidationListener(updateListener));
+        UpdateChecker.outdatedProperty().addListener(new WeakInvalidationListener(updateListener));
+        UpdateChecker.checkingUpdateProperty().addListener(new WeakInvalidationListener(updateListener));
+        updateListener.invalidated(null);
+
+        ToggleGroup updateChannelGroup = new ToggleGroup();
+        chkUpdateDev.setToggleGroup(updateChannelGroup);
+        chkUpdateDev.setUserData(UpdateChannel.DEVELOPMENT);
+        chkUpdateStable.setToggleGroup(updateChannelGroup);
+        chkUpdateStable.setUserData(UpdateChannel.STABLE);
+        ObjectProperty<UpdateChannel> updateChannel = selectedItemPropertyFor(updateChannelGroup, UpdateChannel.class);
+        updateChannel.set(UpdateChannel.getChannel());
+        updateChannel.addListener((a, b, newValue) -> {
+            UpdateChecker.requestCheckUpdate(newValue);
+        });
+        // ====
     }
 
-    private void openLogFolder() {
-        FXUtils.openFolder(LOG.getLogFile().getParent());
+    private void setupDiscordRPCToggle() {
+        VBox rootPane = (VBox) scroll.getContent();
+        ComponentList settingsPane = (ComponentList) rootPane.getChildren().get(0);
+
+        HBox container = new HBox();
+        container.setAlignment(Pos.CENTER_LEFT);
+        container.setSpacing(12);
+        container.setPadding(new Insets(8, 8, 8, 16));
+
+        Label label = new Label("Discord Rich Presence");
+        label.setStyle("-fx-font-size: 14px; -fx-font-weight: 600;");
+        HBox.setHgrow(label, Priority.ALWAYS);
+
+        JFXToggleButton toggle = new JFXToggleButton();
+        toggle.setSize(8);
+        toggle.setStyle("-jfx-toggle-color: -papi-primary; -jfx-untoggle-color: -papi-surface; -jfx-toggle-line: rgba(255,255,255,0.06);"
+                + "-fx-background-color: transparent; -fx-background-insets: 0; -fx-padding: 0; -fx-border-width: 0;");
+        toggle.setSelected(config().isDiscordRpcEnabled());
+
+        toggle.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal) {
+                DiscordRPCService.getInstance().init();
+            } else {
+                DiscordRPCService.getInstance().shutdown();
+            }
+        });
+
+        container.getChildren().addAll(label, toggle);
+        settingsPane.getContent().add(container);
     }
 
-    private void onUpdate() {
+    @Override
+    protected void onUpdate() {
         RemoteVersion target = UpdateChecker.getLatestVersion();
         if (target == null) {
             return;
@@ -264,127 +185,101 @@ public final class SettingsPage extends ScrollPane {
         UpdateHandler.updateFrom(target);
     }
 
-    private static String getEntryName(Set<String> entryNames, String name) {
-        if (entryNames.add(name)) {
-            return name;
-        }
-
-        for (long i = 1; ; i++) {
-            String newName = name + "." + i;
-            if (entryNames.add(newName)) {
-                return newName;
-            }
-        }
-    }
-
-    /// This method guarantees to close both `input` and the current zip entry.
-    ///
-    /// If no exception occurs, this method returns `true`;
-    /// If an exception occurs while reading from `input`, this method returns `false`;
-    /// If an exception occurs while writing to `output`, this method will throw it as is.
-    private static boolean exportLogFile(ZipOutputStream output,
-                                         Path file, // For logging
-                                         String entryName,
-                                         InputStream input,
-                                         byte[] buffer) throws IOException {
-        //noinspection TryFinallyCanBeTryWithResources
-        try {
-            output.putNextEntry(new ZipEntry(entryName));
-            int read;
-            while (true) {
-                try {
-                    read = input.read(buffer);
-                    if (read <= 0)
-                        return true;
-                } catch (Throwable ex) {
-                    LOG.warning("Failed to decompress log file " + file, ex);
-                    return false;
-                }
-
-                output.write(buffer, 0, read);
-            }
-        } finally {
-            try {
-                input.close();
-            } catch (Throwable ex) {
-                LOG.warning("Failed to close log file " + file, ex);
-            }
-            output.closeEntry();
-        }
-    }
-
-    private CompletableFuture<Path> onExportLogs() {
-        return CompletableFuture.supplyAsync(Lang.wrap(() -> {
+    @Override
+    protected void onExportLogs() {
+        thread(() -> {
             String nameBase = "hmcl-exported-logs-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH-mm-ss"));
             List<Path> recentLogFiles = LOG.findRecentLogFiles(5);
 
             Path outputFile;
-            if (recentLogFiles.isEmpty()) {
-                outputFile = Metadata.CURRENT_DIRECTORY.resolve(nameBase + ".log");
+            try {
+                if (recentLogFiles.isEmpty()) {
+                    outputFile = Metadata.CURRENT_DIRECTORY.resolve(nameBase + ".log");
 
-                LOG.info("Exporting latest logs to " + outputFile);
-                try (OutputStream output = Files.newOutputStream(outputFile)) {
-                    LOG.exportLogs(output);
-                }
-            } else {
-                outputFile = Metadata.CURRENT_DIRECTORY.resolve(nameBase + ".zip");
+                    LOG.info("Exporting latest logs to " + outputFile);
+                    try (OutputStream output = Files.newOutputStream(outputFile)) {
+                        LOG.exportLogs(output);
+                    }
+                } else {
+                    outputFile = Metadata.CURRENT_DIRECTORY.resolve(nameBase + ".zip");
 
-                LOG.info("Exporting latest logs to " + outputFile);
+                    LOG.info("Exporting latest logs to " + outputFile);
 
-                byte[] buffer = new byte[IOUtils.DEFAULT_BUFFER_SIZE];
-                try (var os = Files.newOutputStream(outputFile);
-                     var zos = new ZipOutputStream(os)) {
+                    Path tempFile = Files.createTempFile("hmcl-decompress-log-", ".txt");
+                    try (var tempChannel = FileChannel.open(tempFile, StandardOpenOption.READ, StandardOpenOption.WRITE);
+                         var os = Files.newOutputStream(outputFile);
+                         var zos = new ZipOutputStream(os)) {
 
-                    Set<String> entryNames = new HashSet<>();
+                        for (Path path : recentLogFiles) {
+                            String extension = FileUtils.getExtension(path);
+                            decompress:
+                            if ("gz".equalsIgnoreCase(extension) || "xz".equalsIgnoreCase(extension)) {
+                                try (InputStream fis = Files.newInputStream(path);
+                                     InputStream uncompressed = "gz".equalsIgnoreCase(extension)
+                                             ? new GZIPInputStream(fis)
+                                             : new XZInputStream(fis)) {
+                                    uncompressed.transferTo(Channels.newOutputStream(tempChannel));
+                                } catch (IOException e) {
+                                    LOG.warning("Failed to decompress log: " + path, e);
+                                    break decompress;
+                                }
 
-                    for (Path path : recentLogFiles) {
-                        String fileName = FileUtils.getName(path);
-                        String extension = StringUtils.substringAfterLast(fileName, '.');
-
-                        if ("gz".equals(extension) || "xz".equals(extension)) {
-                            // If an exception occurs while decompressing the input file, we should
-                            // ensure the input file and the current zip entry are closed,
-                            // then copy the compressed file content as-is into a new entry in the zip file.
-
-                            InputStream input = null;
-                            try {
-                                input = Files.newInputStream(path);
-                                input = "gz".equals(extension)
-                                        ? new GZIPInputStream(input)
-                                        : new XZInputStream(input);
-                            } catch (Throwable ex) {
-                                LOG.warning("Failed to open log file " + path, ex);
-                                IOUtils.closeQuietly(input, ex);
-                                input = null;
+                                zos.putNextEntry(new ZipEntry(StringUtils.substringBeforeLast(FileUtils.getName(path), '.')));
+                                Channels.newInputStream(tempChannel).transferTo(zos);
+                                zos.closeEntry();
+                                tempChannel.truncate(0);
+                                continue;
                             }
 
-                            String entryName = getEntryName(entryNames, StringUtils.substringBeforeLast(fileName, "."));
-                            if (input != null && exportLogFile(zos, path, entryName, input, buffer))
-                                continue;
+                            zos.putNextEntry(new ZipEntry(FileUtils.getName(path)));
+                            Files.copy(path, zos);
+                            zos.closeEntry();
                         }
 
-                        // Copy the log file content as-is into a new entry in the zip file.
-                        // If an exception occurs while decompressing the input file, we should
-                        // ensure the input file and the current zip entry are closed.
-
-                        InputStream input;
+                        zos.putNextEntry(new ZipEntry("hmcl-latest.log"));
+                        LOG.exportLogs(zos);
+                        zos.closeEntry();
+                    } finally {
                         try {
-                            input = Files.newInputStream(path);
-                        } catch (Throwable ex) {
-                            LOG.warning("Failed to open log file " + path, ex);
-                            continue;
+                            Files.deleteIfExists(tempFile);
+                        } catch (IOException ignored) {
                         }
-
-                        exportLogFile(zos, path, getEntryName(entryNames, fileName), input, buffer);
                     }
-
-                    zos.putNextEntry(new ZipEntry(getEntryName(entryNames, "hmcl-latest.log")));
-                    LOG.exportLogs(zos);
-                    zos.closeEntry();
                 }
+            } catch (IOException e) {
+                LOG.warning("Failed to export logs", e);
+                Platform.runLater(() -> Controllers.dialog(i18n("settings.launcher.launcher_log.export.failed") + "\n" + StringUtils.getStackTrace(e), null, MessageType.ERROR));
+                return;
             }
 
-            return outputFile;
-        }), Schedulers.io());
+            Platform.runLater(() -> Controllers.dialog(i18n("settings.launcher.launcher_log.export.success", outputFile)));
+            FXUtils.showFileInExplorer(outputFile);
+        });
+    }
+
+    @Override
+    protected void onSponsor() {
+        FXUtils.openLink("https://github.com/HMCL-dev/HMCL");
+    }
+
+    @Override
+    protected void clearCacheDirectory() {
+        FileUtils.cleanDirectoryQuietly(new File(Settings.instance().getCommonDirectory(), "cache"));
+    }
+
+    private void onUploadCustomCss() {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle(i18n("settings.launcher.theme.custom_css.choose"));
+        fileChooser.getExtensionFilters().addAll(
+                new FileChooser.ExtensionFilter("CSS Files", "*.css"),
+                new FileChooser.ExtensionFilter("All Files", "*.*")
+        );
+
+        File selectedFile = fileChooser.showOpenDialog(Controllers.getStage());
+
+        if (selectedFile != null) {
+            config().setCustomCssPath(selectedFile.getAbsolutePath());
+            Controllers.dialog(i18n("settings.launcher.theme.custom_css.applied"), null, MessageType.INFO);
+        }
     }
 }

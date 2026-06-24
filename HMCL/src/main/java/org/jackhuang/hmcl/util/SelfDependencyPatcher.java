@@ -47,7 +47,6 @@ import org.jackhuang.hmcl.util.gson.JsonUtils;
 import org.jackhuang.hmcl.util.io.ChecksumMismatchException;
 import org.jackhuang.hmcl.util.io.IOUtils;
 import org.jackhuang.hmcl.java.JavaRuntime;
-import org.jackhuang.hmcl.util.io.JarUtils;
 import org.jackhuang.hmcl.util.platform.Platform;
 
 import javax.swing.*;
@@ -63,6 +62,7 @@ import java.util.List;
 import java.util.*;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.jar.Manifest;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.stream.Collectors.toSet;
@@ -79,11 +79,10 @@ public final class SelfDependencyPatcher {
     private final byte[] buffer = new byte[IOUtils.DEFAULT_BUFFER_SIZE];
     private final MessageDigest digest = DigestUtils.getDigest("SHA-1");
 
-    private SelfDependencyPatcher() throws PatchException {
+    private SelfDependencyPatcher() throws IncompatibleVersionException {
         // We can only self-patch JavaFX on specific platform.
         if (dependencies == null) {
-            throw new PatchException("Unsupported platform: operating system %s, architecture %s".formatted(
-                    System.getProperty("os.name"), System.getProperty("os.arch")));
+            throw new IncompatibleVersionException();
         }
 
         final String customUrl = System.getProperty("hmcl.openjfx.repo");
@@ -93,27 +92,27 @@ public final class SelfDependencyPatcher {
             } else {
                 defaultRepository = Repository.MAVEN_CENTRAL;
             }
-            repositories = List.of(Repository.MAVEN_CENTRAL, Repository.TENCENTCLOUD_MIRROR);
+            repositories = Collections.unmodifiableList(Arrays.asList(Repository.MAVEN_CENTRAL, Repository.TENCENTCLOUD_MIRROR));
         } else {
             defaultRepository = new Repository(String.format(i18n("repositories.custom"), customUrl), customUrl);
-            repositories = List.of(Repository.MAVEN_CENTRAL, Repository.TENCENTCLOUD_MIRROR, defaultRepository);
+            repositories = Collections.unmodifiableList(Arrays.asList(Repository.MAVEN_CENTRAL, Repository.TENCENTCLOUD_MIRROR, defaultRepository));
         }
     }
 
     private static final class DependencyDescriptor {
         private static final String DEPENDENCIES_LIST_FILE = "/assets/openjfx-dependencies.json";
-        private static final Path DEPENDENCIES_DIR_PATH = Metadata.DEPENDENCIES_DIRECTORY.resolve(Platform.CURRENT_PLATFORM.toString()).resolve("openjfx");
+        private static final Path DEPENDENCIES_DIR_PATH = Metadata.DEPENDENCIES_DIRECTORY.resolve(Platform.getPlatform().toString()).resolve("openjfx");
 
         static List<DependencyDescriptor> readDependencies() {
             //noinspection ConstantConditions
             try (Reader reader = new InputStreamReader(SelfDependencyPatcher.class.getResourceAsStream(DEPENDENCIES_LIST_FILE), UTF_8)) {
                 Map<String, Map<String, List<DependencyDescriptor>>> allDependencies =
                         JsonUtils.GSON.fromJson(reader, mapTypeOf(String.class, mapTypeOf(String.class, listTypeOf(DependencyDescriptor.class))));
-                Map<String, List<DependencyDescriptor>> platform = allDependencies.get(Platform.CURRENT_PLATFORM.toString());
+                Map<String, List<DependencyDescriptor>> platform = allDependencies.get(Platform.getPlatform().toString());
                 if (platform == null)
                     return null;
 
-                if (JavaRuntime.CURRENT_VERSION >= 23) {
+                if (JavaRuntime.CURRENT_VERSION >= 22) {
                     List<DependencyDescriptor> modernDependencies = platform.get("modern");
                     if (modernDependencies != null)
                         return modernDependencies;
@@ -144,9 +143,17 @@ public final class SelfDependencyPatcher {
         }
     }
 
-    private record Repository(String name, String url) {
+    private static final class Repository {
         public static final Repository MAVEN_CENTRAL = new Repository(i18n("repositories.maven_central"), "https://repo1.maven.org/maven2");
         public static final Repository TENCENTCLOUD_MIRROR = new Repository(i18n("repositories.tencentcloud_mirror"), "https://mirrors.cloud.tencent.com/nexus/repository/maven-public");
+
+        private final String name;
+        private final String url;
+
+        Repository(String name, String url) {
+            this.name = name;
+            this.url = url;
+        }
 
         public String resolveDependencyURL(DependencyDescriptor descriptor) {
             return String.format("%s/%s/%s/%s/%s",
@@ -160,12 +167,18 @@ public final class SelfDependencyPatcher {
     /**
      * Patch in any missing dependencies, if any.
      */
-    public static void patch() throws PatchException, CancellationException {
+    public static void patch() throws PatchException, IncompatibleVersionException, CancellationException {
         // Do nothing if JavaFX is detected
         try {
-            Class.forName("javafx.application.Application");
-            return;
-        } catch (Exception ignored) {
+            try {
+                Class.forName("javafx.application.Application");
+                return;
+            } catch (Exception ignored) {
+            }
+        } catch (UnsupportedClassVersionError error) {
+            // Loading the JavaFX class was unsupported.
+            // We are probably on 8 and its on 11
+            throw new IncompatibleVersionException();
         }
 
         SelfDependencyPatcher patcher = new SelfDependencyPatcher();
@@ -248,7 +261,14 @@ public final class SelfDependencyPatcher {
                 .map(DependencyDescriptor::localPath)
                 .toArray(Path[]::new);
 
-        String addOpens = JarUtils.getAttribute("hmcl.add-opens", null);
+        String addOpens = null;
+        try (InputStream input = SelfDependencyPatcher.class.getResourceAsStream("/META-INF/MANIFEST.MF")) {
+            if (input != null)
+                addOpens = new Manifest(input).getMainAttributes().getValue("Add-Opens");
+        } catch (IOException e) {
+            LOG.warning("Failed to read MANIFEST.MF file", e);
+        }
+
         JavaFXPatcher.patch(modules, jars, addOpens != null ? addOpens.split(" ") : new String[0]);
     }
 
@@ -269,14 +289,7 @@ public final class SelfDependencyPatcher {
             AtomicBoolean isCancelled = new AtomicBoolean();
             AtomicBoolean showDetails = new AtomicBoolean();
 
-            ProgressFrame dialog;
-            try {
-                dialog = new SwingProgressFrame(i18n("download.javafx"));
-            } catch (HeadlessException e) {
-                LOG.warning("Failed to open dialog", e);
-                dialog = new FakeProgressFrame();
-            }
-
+            ProgressFrame dialog = new ProgressFrame(i18n("download.javafx"));
             dialog.setProgressMaximum(dependencies.size() + 1);
             dialog.setProgress(count);
             dialog.setOnCancel(() -> isCancelled.set(true));
@@ -303,10 +316,9 @@ public final class SelfDependencyPatcher {
                     DependencyDescriptor dependency = dependencies.get(i);
 
                     final String url = repository.resolveDependencyURL(dependency);
-                    ProgressFrame finalDialog = dialog;
                     SwingUtilities.invokeLater(() -> {
-                        finalDialog.setCurrent(dependency.module);
-                        finalDialog.incrementProgress();
+                        dialog.setCurrent(dependency.module);
+                        dialog.incrementProgress();
                     });
 
                     LOG.info("Downloading " + url);
@@ -375,47 +387,28 @@ public final class SelfDependencyPatcher {
             }
         }
 
-        String sha1 = HexFormat.of().formatHex(digest.digest());
+        String sha1 = Hex.encodeHex(digest.digest());
         if (!dependency.sha1().equalsIgnoreCase(sha1))
             throw new ChecksumMismatchException("SHA-1", dependency.sha1(), sha1);
     }
 
     public static class PatchException extends Exception {
-        PatchException(String message) {
-            super(message);
-        }
-
         PatchException(String message, Throwable cause) {
             super(message, cause);
         }
     }
 
-    public sealed interface ProgressFrame {
-        void setCurrent(String component);
-
-        void setProgressMaximum(int total);
-
-        void setProgress(int n);
-
-        void incrementProgress();
-
-        void setOnCancel(Runnable action);
-
-        void setOnChangeSource(Runnable action);
-
-        void setVisible(boolean visible);
-
-        void dispose();
+    public static class IncompatibleVersionException extends Exception {
     }
 
-    public static final class SwingProgressFrame extends JDialog implements ProgressFrame {
+    public static class ProgressFrame extends JDialog {
 
         private final JProgressBar progressBar;
         private final JLabel progressText;
         private final JButton btnChangeSource;
         private final JButton btnCancel;
 
-        public SwingProgressFrame(String title) {
+        public ProgressFrame(String title) {
             JPanel panel = new JPanel();
 
             setResizable(false);
@@ -477,41 +470,6 @@ public final class SelfDependencyPatcher {
 
         public void setOnChangeSource(Runnable action) {
             btnChangeSource.addActionListener(e -> action.run());
-        }
-    }
-
-    public static final class FakeProgressFrame implements ProgressFrame {
-
-        @Override
-        public void setCurrent(String component) {
-        }
-
-        @Override
-        public void setProgressMaximum(int total) {
-        }
-
-        @Override
-        public void setProgress(int n) {
-        }
-
-        @Override
-        public void incrementProgress() {
-        }
-
-        @Override
-        public void setOnCancel(Runnable action) {
-        }
-
-        @Override
-        public void setOnChangeSource(Runnable action) {
-        }
-
-        @Override
-        public void setVisible(boolean visible) {
-        }
-
-        @Override
-        public void dispose() {
         }
     }
 }

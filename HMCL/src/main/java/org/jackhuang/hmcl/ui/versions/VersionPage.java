@@ -21,32 +21,31 @@ import com.jfoenix.controls.JFXPopup;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.*;
-import javafx.event.Event;
-import javafx.event.EventType;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Paint;
 import org.jackhuang.hmcl.event.EventBus;
 import org.jackhuang.hmcl.event.EventPriority;
 import org.jackhuang.hmcl.event.RefreshedVersionsEvent;
 import org.jackhuang.hmcl.game.GameRepository;
-import org.jackhuang.hmcl.setting.GameSettings;
+import org.jackhuang.hmcl.game.HMCLGameRepository;
 import org.jackhuang.hmcl.setting.Profile;
-import org.jackhuang.hmcl.task.Schedulers;
-import org.jackhuang.hmcl.task.Task;
-import org.jackhuang.hmcl.ui.Controllers;
 import org.jackhuang.hmcl.ui.FXUtils;
 import org.jackhuang.hmcl.ui.SVG;
 import org.jackhuang.hmcl.ui.WeakListenerHolder;
+import org.jackhuang.hmcl.ui.animation.ContainerAnimations;
 import org.jackhuang.hmcl.ui.animation.TransitionPane;
 import org.jackhuang.hmcl.ui.construct.*;
 import org.jackhuang.hmcl.ui.decorator.DecoratorAnimatedPage;
 import org.jackhuang.hmcl.ui.decorator.DecoratorPage;
-import org.jackhuang.hmcl.ui.game.GameSettingsPage;
-import org.jackhuang.hmcl.util.StringUtils;
 import org.jackhuang.hmcl.util.io.FileUtils;
 
-import java.nio.file.Path;
+import java.io.File;
 import java.util.Optional;
 import java.util.function.Supplier;
 
@@ -56,12 +55,11 @@ import static org.jackhuang.hmcl.util.i18n.I18n.i18n;
 public class VersionPage extends DecoratorAnimatedPage implements DecoratorPage {
     private final ReadOnlyObjectWrapper<State> state = new ReadOnlyObjectWrapper<>();
     private final TabHeader tab;
-    private final TabHeader.Tab<GameSettingsPage<GameSettings.Instance>> versionSettingsTab = new TabHeader.Tab<>("versionSettingsTab");
+    private final TabHeader.Tab<VersionSettingsPage> versionSettingsTab = new TabHeader.Tab<>("versionSettingsTab");
     private final TabHeader.Tab<InstallerListPage> installerListTab = new TabHeader.Tab<>("installerListTab");
     private final TabHeader.Tab<ModListPage> modListTab = new TabHeader.Tab<>("modListTab");
     private final TabHeader.Tab<WorldListPage> worldListTab = new TabHeader.Tab<>("worldList");
     private final TabHeader.Tab<SchematicsPage> schematicsTab = new TabHeader.Tab<>("schematicsTab");
-    private final TabHeader.Tab<ResourcePackListPage> resourcePackTab = new TabHeader.Tab<>("resourcePackTab");
     private final TransitionPane transitionPane = new TransitionPane();
     private final BooleanProperty currentVersionUpgradable = new SimpleBooleanProperty();
     private final ObjectProperty<Profile.ProfileVersion> version = new SimpleObjectProperty<>();
@@ -69,40 +67,21 @@ public class VersionPage extends DecoratorAnimatedPage implements DecoratorPage 
 
     private String preferredVersionName = null;
 
-    public static class WorkingDirChangedEvent extends Event {
-        public static final EventType<WorkingDirChangedEvent> EVENT_TYPE = new EventType<>(Event.ANY, "WORKING_DIR_CHANGED");
-
-        public WorkingDirChangedEvent() {
-            super(EVENT_TYPE);
-        }
-    }
-
     public VersionPage() {
-        versionSettingsTab.setNodeSupplier(loadVersionFor(() -> new GameSettingsPage<>(GameSettings.Instance.class)));
+        versionSettingsTab.setNodeSupplier(loadVersionFor(() -> new VersionSettingsPage(false)));
         installerListTab.setNodeSupplier(loadVersionFor(InstallerListPage::new));
         modListTab.setNodeSupplier(loadVersionFor(ModListPage::new));
-        resourcePackTab.setNodeSupplier(loadVersionFor(ResourcePackListPage::new));
         worldListTab.setNodeSupplier(loadVersionFor(WorldListPage::new));
         schematicsTab.setNodeSupplier(loadVersionFor(SchematicsPage::new));
 
-        tab = new TabHeader(transitionPane, versionSettingsTab, installerListTab, modListTab, resourcePackTab, worldListTab, schematicsTab);
-        tab.select(versionSettingsTab);
+        tab = new TabHeader(versionSettingsTab, installerListTab, modListTab, worldListTab, schematicsTab);
 
         addEventHandler(Navigator.NavigationEvent.NAVIGATED, this::onNavigated);
 
-        addEventHandler(WorkingDirChangedEvent.EVENT_TYPE, event -> {
-            if (this.version.get() != null) {
-                if (installerListTab.isInitialized())
-                    installerListTab.getNode().loadVersion(getProfile(), getVersion());
-                if (modListTab.isInitialized())
-                    modListTab.getNode().loadVersion(getProfile(), getVersion());
-                if (resourcePackTab.isInitialized())
-                    resourcePackTab.getNode().loadVersion(getProfile(), getVersion());
-                if (worldListTab.isInitialized())
-                    worldListTab.getNode().loadVersion(getProfile(), getVersion());
-                if (schematicsTab.isInitialized())
-                    schematicsTab.getNode().loadVersion(getProfile(), getVersion());
-            }
+        tab.select(versionSettingsTab);
+        transitionPane.setContent(versionSettingsTab.getNode(), ContainerAnimations.NONE);
+        FXUtils.onChange(tab.getSelectionModel().selectedItemProperty(), newValue -> {
+            transitionPane.setContent(newValue.getNode(), ContainerAnimations.FADE);
         });
 
         listenerHolder.add(EventBus.EVENT_BUS.channel(RefreshedVersionsEvent.class).registerWeak(event -> checkSelectedVersion(), EventPriority.HIGHEST));
@@ -111,10 +90,10 @@ public class VersionPage extends DecoratorAnimatedPage implements DecoratorPage 
     private void checkSelectedVersion() {
         runInFX(() -> {
             if (this.version.get() == null) return;
-            GameRepository repository = this.version.get().profile().getRepository();
-            if (!repository.hasVersion(this.version.get().version())) {
+            GameRepository repository = this.version.get().getProfile().getRepository();
+            if (!repository.hasVersion(this.version.get().getVersion())) {
                 if (preferredVersionName != null) {
-                    loadVersion(preferredVersionName, this.version.get().profile());
+                    loadVersion(preferredVersionName, this.version.get().getProfile());
                 } else {
                     fireEvent(new PageCloseEvent());
                 }
@@ -127,15 +106,11 @@ public class VersionPage extends DecoratorAnimatedPage implements DecoratorPage 
             T node = nodeSupplier.get();
             if (version.get() != null) {
                 if (node instanceof VersionPage.VersionLoadable) {
-                    ((VersionLoadable) node).loadVersion(version.get().profile(), version.get().version());
+                    ((VersionLoadable) node).loadVersion(version.get().getProfile(), version.get().getVersion());
                 }
             }
             return node;
         };
-    }
-
-    public void showInstanceSettings() {
-        tab.select(versionSettingsTab, false);
     }
 
     public void setVersion(String version, Profile profile) {
@@ -160,8 +135,6 @@ public class VersionPage extends DecoratorAnimatedPage implements DecoratorPage 
             installerListTab.getNode().loadVersion(profile, version);
         if (modListTab.isInitialized())
             modListTab.getNode().loadVersion(profile, version);
-        if (resourcePackTab.isInitialized())
-            resourcePackTab.getNode().loadVersion(profile, version);
         if (worldListTab.isInitialized())
             worldListTab.getNode().loadVersion(profile, version);
         if (schematicsTab.isInitialized())
@@ -185,7 +158,7 @@ public class VersionPage extends DecoratorAnimatedPage implements DecoratorPage 
     }
 
     private void onBrowse(String sub) {
-        FXUtils.openFolder(getProfile().getRepository().getRunDirectory(getVersion()).resolve(sub));
+        FXUtils.openFolder(new File(getProfile().getRepository().getRunDirectory(getVersion()), sub));
     }
 
     private void redownloadAssetIndex() {
@@ -193,34 +166,15 @@ public class VersionPage extends DecoratorAnimatedPage implements DecoratorPage 
     }
 
     private void clearLibraries() {
-        var libraries = getProfile().getRepository().getBaseDirectory().resolve("libraries");
-        Task.runAsync(Schedulers.io(), () -> {
-            FileUtils.deleteDirectoryQuietly(libraries);
-        }).whenComplete(Schedulers.javafx(), (exception) -> {
-            if (exception != null) {
-                Controllers.dialog(i18n("message.failed") + "\n" + StringUtils.getStackTrace(exception), i18n("message.error"), MessageDialogPane.MessageType.ERROR);
-            }
-        }).start();
+        FileUtils.deleteDirectoryQuietly(new File(getProfile().getRepository().getBaseDirectory(), "libraries"));
     }
 
     private void clearAssets() {
-        Path assetsDir = getProfile().getRepository().getBaseDirectory().resolve("assets");
-
-        Profile.ProfileVersion currentVersion = version.get();
-        Path resourcesDir = currentVersion != null
-                ? getProfile().getRepository().getRunDirectory(currentVersion.version()).resolve("resources")
-                : null;
-
-        Task.runAsync(Schedulers.io(), () -> {
-            FileUtils.deleteDirectoryQuietly(assetsDir);
-            if (resourcesDir != null) {
-                FileUtils.deleteDirectoryQuietly(resourcesDir);
-            }
-        }).whenComplete(Schedulers.javafx(), (exception) -> {
-            if (exception != null) {
-                Controllers.dialog(i18n("message.failed") + "\n" + StringUtils.getStackTrace(exception), i18n("message.error"), MessageDialogPane.MessageType.ERROR);
-            }
-        }).start();
+        HMCLGameRepository baseDirectory = getProfile().getRepository();
+        FileUtils.deleteDirectoryQuietly(new File(baseDirectory.getBaseDirectory(), "assets"));
+        if (version.get() != null) {
+            FileUtils.deleteDirectoryQuietly(new File(baseDirectory.getRunDirectory(version.get().getVersion()), "resources"));
+        }
     }
 
     private void clearJunkFiles() {
@@ -257,11 +211,11 @@ public class VersionPage extends DecoratorAnimatedPage implements DecoratorPage 
     }
 
     public Profile getProfile() {
-        return Optional.ofNullable(version.get()).map(Profile.ProfileVersion::profile).orElse(null);
+        return Optional.ofNullable(version.get()).map(Profile.ProfileVersion::getProfile).orElse(null);
     }
 
     public String getVersion() {
-        return Optional.ofNullable(version.get()).map(Profile.ProfileVersion::version).orElse(null);
+        return Optional.ofNullable(version.get()).map(Profile.ProfileVersion::getVersion).orElse(null);
     }
 
     @Override
@@ -285,13 +239,56 @@ public class VersionPage extends DecoratorAnimatedPage implements DecoratorPage 
             super(control);
 
             {
+                BorderPane left = new BorderPane();
+                FXUtils.setLimitWidth(left, 200);
+                setLeft(left);
+
+                AdvancedListItem versionSettingsItem = new AdvancedListItem();
+                versionSettingsItem.getStyleClass().add("navigation-drawer-item");
+                versionSettingsItem.setTitle(i18n("settings.game"));
+                versionSettingsItem.setLeftGraphic(wrap(SVG.SETTINGS));
+                versionSettingsItem.setActionButtonVisible(false);
+                versionSettingsItem.activeProperty().bind(control.tab.getSelectionModel().selectedItemProperty().isEqualTo(control.versionSettingsTab));
+                versionSettingsItem.setOnAction(e -> control.tab.select(control.versionSettingsTab));
+
+                AdvancedListItem installerListItem = new AdvancedListItem();
+                installerListItem.getStyleClass().add("navigation-drawer-item");
+                installerListItem.setTitle(i18n("settings.tabs.installers"));
+                installerListItem.setLeftGraphic(wrap(SVG.DEPLOYED_CODE));
+                installerListItem.setActionButtonVisible(false);
+                installerListItem.activeProperty().bind(control.tab.getSelectionModel().selectedItemProperty().isEqualTo(control.installerListTab));
+                installerListItem.setOnAction(e -> control.tab.select(control.installerListTab));
+
+                AdvancedListItem modListItem = new AdvancedListItem();
+                modListItem.getStyleClass().add("navigation-drawer-item");
+                modListItem.setTitle(i18n("mods.manage"));
+                modListItem.setLeftGraphic(wrap(SVG.EXTENSION));
+                modListItem.setActionButtonVisible(false);
+                modListItem.activeProperty().bind(control.tab.getSelectionModel().selectedItemProperty().isEqualTo(control.modListTab));
+                modListItem.setOnAction(e -> control.tab.select(control.modListTab));
+
+                AdvancedListItem worldListItem = new AdvancedListItem();
+                worldListItem.getStyleClass().add("navigation-drawer-item");
+                worldListItem.setTitle(i18n("world.manage"));
+                worldListItem.setLeftGraphic(wrap(SVG.PUBLIC));
+                worldListItem.setActionButtonVisible(false);
+                worldListItem.activeProperty().bind(control.tab.getSelectionModel().selectedItemProperty().isEqualTo(control.worldListTab));
+                worldListItem.setOnAction(e -> control.tab.select(control.worldListTab));
+
+                AdvancedListItem schematicsListItem = new AdvancedListItem();
+                schematicsListItem.getStyleClass().add("navigation-drawer-item");
+                schematicsListItem.setTitle(i18n("schematics.manage"));
+                schematicsListItem.setLeftGraphic(wrap(SVG.SCHEMA));
+                schematicsListItem.setActionButtonVisible(false);
+                schematicsListItem.activeProperty().bind(control.tab.getSelectionModel().selectedItemProperty().isEqualTo(control.schematicsTab));
+                schematicsListItem.setOnAction(e -> control.tab.select(control.schematicsTab));
+
                 AdvancedListBox sideBar = new AdvancedListBox()
-                        .addNavigationDrawerTab(control.tab, control.versionSettingsTab, i18n("settings.game"), SVG.SETTINGS, SVG.SETTINGS_FILL)
-                        .addNavigationDrawerTab(control.tab, control.installerListTab, i18n("settings.tabs.installers"), SVG.DEPLOYED_CODE, SVG.DEPLOYED_CODE_FILL)
-                        .addNavigationDrawerTab(control.tab, control.modListTab, i18n("mods.manage"), SVG.EXTENSION, SVG.EXTENSION_FILL)
-                        .addNavigationDrawerTab(control.tab, control.resourcePackTab, i18n("resourcepack.manage"), SVG.TEXTURE)
-                        .addNavigationDrawerTab(control.tab, control.worldListTab, i18n("world.manage"), SVG.PUBLIC)
-                        .addNavigationDrawerTab(control.tab, control.schematicsTab, i18n("schematics.manage"), SVG.SCHEMA, SVG.SCHEMA_FILL);
+                        .add(versionSettingsItem)
+                        .add(installerListItem)
+                        .add(modListItem)
+                        .add(worldListItem)
+                        .add(schematicsListItem);
                 VBox.setVgrow(sideBar, Priority.ALWAYS);
 
                 PopupMenu browseList = new PopupMenu();
@@ -299,14 +296,13 @@ public class VersionPage extends DecoratorAnimatedPage implements DecoratorPage 
                 browseList.getContent().setAll(
                         new IconedMenuItem(SVG.STADIA_CONTROLLER, i18n("folder.game"), () -> control.onBrowse(""), browsePopup),
                         new IconedMenuItem(SVG.EXTENSION, i18n("folder.mod"), () -> control.onBrowse("mods"), browsePopup),
-                        new IconedMenuItem(SVG.TEXTURE, i18n("folder.resourcepacks"), () -> control.onBrowse("resourcepacks"), browsePopup),
-                        new IconedMenuItem(SVG.PUBLIC, i18n("folder.saves"), () -> control.onBrowse("saves"), browsePopup),
-                        new IconedMenuItem(SVG.SCHEMA, i18n("folder.schematics"), () -> control.onBrowse("schematics"), browsePopup),
-                        new IconedMenuItem(SVG.WB_SUNNY, i18n("folder.shaderpacks"), () -> control.onBrowse("shaderpacks"), browsePopup),
-                        new IconedMenuItem(SVG.SCREENSHOT_MONITOR, i18n("folder.screenshots"), () -> control.onBrowse("screenshots"), browsePopup),
                         new IconedMenuItem(SVG.SETTINGS, i18n("folder.config"), () -> control.onBrowse("config"), browsePopup),
-                        new IconedMenuItem(SVG.SCRIPT, i18n("folder.logs"), () -> control.onBrowse("logs"), browsePopup),
-                        new IconedMenuItem(SVG.FRAME_BUG, i18n("folder.crash-reports"), () -> control.onBrowse("crash-reports"), browsePopup)
+                        new IconedMenuItem(SVG.TEXTURE, i18n("folder.resourcepacks"), () -> control.onBrowse("resourcepacks"), browsePopup),
+                        new IconedMenuItem(SVG.WB_SUNNY, i18n("folder.shaderpacks"), () -> control.onBrowse("shaderpacks"), browsePopup),
+                        new IconedMenuItem(SVG.SCHEMA, i18n("folder.schematics"), () -> control.onBrowse("schematics"), browsePopup),
+                        new IconedMenuItem(SVG.SCREENSHOT_MONITOR, i18n("folder.screenshots"), () -> control.onBrowse("screenshots"), browsePopup),
+                        new IconedMenuItem(SVG.PUBLIC, i18n("folder.saves"), () -> control.onBrowse("saves"), browsePopup),
+                        new IconedMenuItem(SVG.SCRIPT, i18n("folder.logs"), () -> control.onBrowse("logs"), browsePopup)
                 );
 
                 PopupMenu managementList = new PopupMenu();
@@ -351,6 +347,20 @@ public class VersionPage extends DecoratorAnimatedPage implements DecoratorPage 
             //FXUtils.setOverflowHidden(control.transitionPane, 8);
             setCenter(control.transitionPane);
         }
+    }
+
+    public static Node wrap(Node node) {
+        StackPane stackPane = new StackPane();
+        stackPane.setAlignment(Pos.CENTER);
+        FXUtils.setLimitWidth(stackPane, 30);
+        FXUtils.setLimitHeight(stackPane, 20);
+        stackPane.setPadding(new Insets(0, 0, 0, 0));
+        stackPane.getChildren().setAll(node);
+        return stackPane;
+    }
+
+    public static Node wrap(SVG svg) {
+        return wrap(svg.createIcon((Paint) null, 20));
     }
 
     public interface VersionLoadable {

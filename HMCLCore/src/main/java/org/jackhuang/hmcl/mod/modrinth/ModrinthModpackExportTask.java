@@ -1,20 +1,3 @@
-/*
- * Hello Minecraft! Launcher
- * Copyright (C) 2026 huangyuhui <huanghongxun2008@126.com> and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
 package org.jackhuang.hmcl.mod.modrinth;
 
 import java.io.File;
@@ -44,22 +27,16 @@ public class ModrinthModpackExportTask extends Task<Void> {
     private final DefaultGameRepository repository;
     private final String version;
     private final ModpackExportInfo info;
-    private final Path modpackFile;
+    private final File modpackFile;
 
-    public ModrinthModpackExportTask(DefaultGameRepository repository, String version, ModpackExportInfo info, Path modpackFile) {
+    public ModrinthModpackExportTask(DefaultGameRepository repository, String version, ModpackExportInfo info, File modpackFile) {
         this.repository = repository;
         this.version = version;
         this.info = info.validate();
         this.modpackFile = modpackFile;
 
         onDone().register(event -> {
-            if (event.isFailed()) {
-                try {
-                    Files.deleteIfExists(modpackFile);
-                } catch (IOException e) {
-                    LOG.warning("Failed to delete modpack file: " + modpackFile, e);
-                }
-            }
+            if (event.isFailed()) modpackFile.delete();
         });
     }
 
@@ -78,14 +55,14 @@ public class ModrinthModpackExportTask extends Task<Void> {
         Optional<RemoteMod.Version> curseForgeVersion = Optional.empty();
 
         try {
-            modrinthVersion = ModrinthRemoteModRepository.MODS.getRemoteVersionByLocalFile(file);
+            modrinthVersion = ModrinthRemoteModRepository.MODS.getRemoteVersionByLocalFile(localModFile, file);
         } catch (IOException e) {
             LOG.warning("Failed to get remote file from Modrinth for: " + file, e);
         }
 
         if (!info.isSkipCurseForgeRemoteFiles() && CurseForgeRemoteModRepository.isAvailable()) {
             try {
-                curseForgeVersion = CurseForgeRemoteModRepository.MODS.getRemoteVersionByLocalFile(file);
+                curseForgeVersion = CurseForgeRemoteModRepository.MODS.getRemoteVersionByLocalFile(localModFile, file);
             } catch (IOException e) {
                 LOG.warning("Failed to get remote file from CurseForge for: " + file, e);
             }
@@ -130,8 +107,8 @@ public class ModrinthModpackExportTask extends Task<Void> {
         blackList.add(version + ".jar");
         blackList.add(version + ".json");
         LOG.info("Compressing game files without some files in blacklist, including files or directories: usernamecache.json, asm, logs, backups, versions, assets, usercache.json, libraries, crash-reports, launcher_profiles.json, NVIDIA, TCNodeTracker");
-        try (var zip = new Zipper(modpackFile)) {
-            Path runDirectory = repository.getRunDirectory(version);
+        try (Zipper zip = new Zipper(modpackFile.toPath())) {
+            Path runDirectory = repository.getRunDirectory(version).toPath();
             List<ModrinthManifest.File> files = new ArrayList<>();
             Set<String> filesInManifest = new HashSet<>();
 
@@ -162,7 +139,7 @@ public class ModrinthModpackExportTask extends Task<Void> {
             }
 
             zip.putDirectory(runDirectory, "client-overrides", path -> {
-                String relativePath = path.replace(File.separatorChar, '/');
+                String relativePath = path.toString().replace(File.separatorChar, '/');
                 if (filesInManifest.contains(relativePath)) {
                     return false;
                 }

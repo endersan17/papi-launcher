@@ -31,7 +31,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
-import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
@@ -424,7 +423,7 @@ public class McbbsModpackManifest implements ModpackManifest, Validation {
                 .orElseThrow(() -> new IOException("Cannot find game version")).getVersion();
         return new Modpack(name, author, version, gameVersion, description, encoding, this) {
             @Override
-            public Task<?> getInstallTask(DefaultDependencyManager dependencyManager, Path zipFile, String name, String iconUrl) {
+            public Task<?> getInstallTask(DefaultDependencyManager dependencyManager, java.io.File zipFile, String name) {
                 return new McbbsModpackLocalInstallTask(dependencyManager, zipFile, this, McbbsModpackManifest.this, name);
             }
         };

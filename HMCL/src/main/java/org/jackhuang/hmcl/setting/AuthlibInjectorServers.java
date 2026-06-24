@@ -21,7 +21,6 @@ import com.google.gson.JsonParseException;
 import org.jackhuang.hmcl.auth.authlibinjector.AuthlibInjectorServer;
 import org.jackhuang.hmcl.task.Schedulers;
 import org.jackhuang.hmcl.task.Task;
-import org.jackhuang.hmcl.util.gson.JsonSerializable;
 import org.jackhuang.hmcl.util.gson.JsonUtils;
 import org.jackhuang.hmcl.util.gson.TolerableValidationException;
 import org.jackhuang.hmcl.util.gson.Validation;
@@ -35,11 +34,9 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 
-import static org.jackhuang.hmcl.setting.SettingsManager.settings;
-import static org.jackhuang.hmcl.setting.SettingsManager.getAuthlibInjectorServers;
+import static org.jackhuang.hmcl.setting.ConfigHolder.config;
 import static org.jackhuang.hmcl.util.logging.Logger.LOG;
 
-@JsonSerializable
 public final class AuthlibInjectorServers implements Validation {
 
     public static final String CONFIG_FILENAME = "authlib-injectors.json";
@@ -72,7 +69,7 @@ public final class AuthlibInjectorServers implements Validation {
             configLocation = Paths.get(CONFIG_FILENAME);
         }
 
-        if (SettingsManager.isNewlyCreated() && Files.exists(configLocation)) {
+        if (ConfigHolder.isNewlyCreated() && Files.exists(configLocation)) {
             AuthlibInjectorServers configInstance;
             try {
                 configInstance = JsonUtils.fromJsonFile(configLocation, AuthlibInjectorServers.class);
@@ -82,11 +79,11 @@ public final class AuthlibInjectorServers implements Validation {
             }
 
             if (!configInstance.urls.isEmpty()) {
-                settings().preferredLoginTypeProperty().set(Accounts.getLoginType(Accounts.FACTORY_AUTHLIB_INJECTOR));
+                config().setPreferredLoginType(Accounts.getLoginType(Accounts.FACTORY_AUTHLIB_INJECTOR));
                 for (String url : configInstance.urls) {
                     Task.supplyAsync(Schedulers.io(), () -> AuthlibInjectorServer.locateServer(url))
                             .thenAcceptAsync(Schedulers.javafx(), server -> {
-                                getAuthlibInjectorServers().add(server);
+                                config().getAuthlibInjectorServers().add(server);
                                 servers.add(server);
                             })
                             .start();

@@ -71,22 +71,13 @@
     "externalLink" : "https://github.com/mcmod-info-mirror"
   },
   {
-    "image" : "/assets/img/8mi-tech.png",
-    "titleLocalized" : "about.thanks_to.8mi-tech",
-    "subtitleLocalized" : "about.thanks_to.8mi-tech.statement",
-    "externalLink" : "https://8mi.tech"
-  },
-  {
-    "image" : {
-      "light" : "/assets/img/github.png",
-      "dark" : "/assets/img/github-white.png"
-    },
+    "image" : "/assets/img/github.png",
     "titleLocalized" : "about.thanks_to.contributors",
     "subtitleLocalized" : "about.thanks_to.contributors.statement",
     "externalLink" : "https://github.com/HMCL-dev/HMCL/graphs/contributors"
   },
   {
-    "image" : "/assets/img/icon.png",
+    "image" : "/assets/img/icon-HMCL.png",
     "titleLocalized" : "about.thanks_to.users",
     "subtitleLocalized" : "about.thanks_to.users.statement",
     "externalLink" : "https://docs.hmcl.net/groups.html"

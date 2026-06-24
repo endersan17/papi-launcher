@@ -21,20 +21,18 @@ import org.jackhuang.hmcl.Metadata;
 import org.jackhuang.hmcl.auth.AuthInfo;
 import org.jackhuang.hmcl.launch.DefaultLauncher;
 import org.jackhuang.hmcl.launch.ProcessListener;
-import org.jackhuang.hmcl.util.NativePatcher;
 import org.jackhuang.hmcl.util.i18n.LocaleUtils;
 import org.jackhuang.hmcl.util.io.FileUtils;
-import org.jackhuang.hmcl.util.io.JarUtils;
-import org.jackhuang.hmcl.util.platform.CommandBuilder;
 import org.jackhuang.hmcl.util.platform.ManagedProcess;
 import org.jackhuang.hmcl.util.versioning.GameVersionNumber;
 
+import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.file.*;
 import java.util.*;
 import java.util.stream.Stream;
 
+import static org.jackhuang.hmcl.setting.ConfigHolder.config;
 import static org.jackhuang.hmcl.util.logging.Logger.LOG;
 
 /**
@@ -63,10 +61,10 @@ public final class HMCLGameLauncher extends DefaultLauncher {
     }
 
     private void generateOptionsTxt() {
-        if (options.isDisableAutoGameOptions())
+        if (config().isDisableAutoGameOptions())
             return;
 
-        Path runDir = repository.getRunDirectory(version.getId());
+        Path runDir = getEffectiveRunDirectory().toPath();
         Path optionsFile = runDir.resolve("options.txt");
         Path configFolder = runDir.resolve("config");
 
@@ -83,6 +81,8 @@ public final class HMCLGameLauncher extends DefaultLauncher {
         }
 
         Locale locale = Locale.getDefault();
+        if (LocaleUtils.isEnglish(locale))
+            return;
 
         /*
          *  1.0         : No language option, do not set for these versions
@@ -111,35 +111,36 @@ public final class HMCLGameLauncher extends DefaultLauncher {
     }
 
     private static String normalizedLanguageTag(Locale locale, GameVersionNumber gameVersion) {
+        String language = locale.getLanguage();
         String region = locale.getCountry();
 
-        return switch (LocaleUtils.getRootLanguage(locale)) {
-            case "ar" -> "ar_SA";
-            case "es" -> "es_ES";
-            case "ja" -> "ja_JP";
-            case "ru" -> "ru_RU";
-            case "uk" -> "uk_UA";
-            case "zh" -> {
-                if ("lzh".equals(locale.getLanguage()) && gameVersion.compareTo("1.16") >= 0)
-                    yield "lzh";
-
-                String script = LocaleUtils.getScript(locale);
-                if ("Hant".equals(script)) {
-                    if ((region.equals("HK") || region.equals("MO") && gameVersion.compareTo("1.16") >= 0))
-                        yield "zh_HK";
-                    yield "zh_TW";
+        switch (language) {
+            case "ru":
+                return "ru_RU";
+            case "uk":
+                return "uk_UA";
+            case "es":
+                return "es_ES";
+            case "ja":
+                return "ja_JP";
+            case "lzh":
+                return gameVersion.compareTo("1.16") >= 0
+                        ? "lzh"
+                        : "";
+            case "zh":
+            default:
+                if (LocaleUtils.isChinese(locale)) {
+                    String script = LocaleUtils.getScript(locale);
+                    if ("Hant".equals(script)) {
+                        if ((region.equals("HK") || region.equals("MO") && gameVersion.compareTo("1.16") >= 0))
+                            return "zh_HK";
+                        return "zh_TW";
+                    }
+                    return "zh_CN";
                 }
-                yield "zh_CN";
-            }
-            case "en" -> {
-                if ("Qabs".equals(LocaleUtils.getScript(locale)) && gameVersion.compareTo("1.16") >= 0) {
-                    yield "en_UD";
-                }
 
-                yield "";
-            }
-            default -> "";
-        };
+                return "";
+        }
     }
 
     @Override
@@ -149,64 +150,8 @@ public final class HMCLGameLauncher extends DefaultLauncher {
     }
 
     @Override
-    public void makeLaunchScript(Path scriptFile) throws IOException {
+    public void makeLaunchScript(File scriptFile) throws IOException {
         generateOptionsTxt();
         super.makeLaunchScript(scriptFile);
     }
-
-    @Override
-    protected void appendJvmArgs(CommandBuilder result) {
-        super.appendJvmArgs(result);
-
-        if (options.isAllowAutoAgent()
-                && !options.isNoGeneratedJVMArgs()
-                && !options.isNoGeneratedOptimizingJVMArgs()
-                && NativePatcher.needPatchMemoryUtil(version, options.getJava().getParsedVersion())) {
-            LOG.info("Attempting to patch game with lwjgl-unsafe-agent");
-            try {
-                result.add("-javaagent:" + extractLwjglUnsafeAgent());
-            } catch (Exception e) {
-                LOG.warning("Failed to extract lwjgl-unsafe-agent", e);
-            }
-        }
-    }
-
-    private Path extractLwjglUnsafeAgent() throws IOException {
-        String agentVersion = JarUtils.getAttribute("hmcl.lwjgl-unsafe-agent.version", null);
-        if (agentVersion == null) {
-            throw new IOException("Missing hmcl.lwjgl-unsafe-agent.version attribute");
-        }
-
-        Library library = new Library(new Artifact("org.glavo", "lwjgl-unsafe-agent", agentVersion));
-        String fileName = library.getArtifact().getFileName();
-
-        Path agentPath = repository.getLibraryFile(version, library).toAbsolutePath().normalize();
-        if (agentPath.toString().contains("=")) {
-            throw new IOException("Invalid library path: " + agentPath);
-        }
-
-        byte[] bytes;
-        try (InputStream input = DefaultLauncher.class.getResourceAsStream("/assets/" + fileName)) {
-            if (input == null) {
-                throw new IOException("/assets/" + fileName + " not found");
-            }
-
-            bytes = input.readAllBytes();
-        }
-
-        if (Files.isRegularFile(agentPath)) {
-            try {
-                if (Files.size(agentPath) == bytes.length) {
-                    return agentPath;
-                }
-            } catch (IOException e) {
-                LOG.warning("Failed to check size of " + agentPath, e);
-            }
-        }
-
-        Files.createDirectories(agentPath.getParent());
-        FileUtils.saveSafely(agentPath, output -> output.write(bytes));
-        return agentPath;
-    }
-
 }

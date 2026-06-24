@@ -18,20 +18,17 @@
 package org.jackhuang.hmcl;
 
 import org.jackhuang.hmcl.util.FileSaver;
+import org.jackhuang.hmcl.ui.AwtUtils;
 import org.jackhuang.hmcl.util.SelfDependencyPatcher;
 import org.jackhuang.hmcl.util.SwingUtils;
 import org.jackhuang.hmcl.java.JavaRuntime;
-import org.jackhuang.hmcl.util.io.FileUtils;
-import org.jackhuang.hmcl.util.io.JarUtils;
 import org.jackhuang.hmcl.util.platform.OperatingSystem;
 
-import javax.swing.JOptionPane;
 import java.io.IOException;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.concurrent.CancellationException;
 
 import static org.jackhuang.hmcl.util.logging.Logger.LOG;
@@ -48,17 +45,33 @@ public final class EntryPoint {
         System.getProperties().putIfAbsent("http.agent", "HMCL/" + Metadata.VERSION);
 
         createHMCLDirectories();
-        LOG.start(Metadata.HMCL_LOCAL_HOME.resolve("logs"));
+        LOG.start(Metadata.HMCL_CURRENT_DIRECTORY.resolve("logs"));
 
-        checkWine();
+        // Forzar la aceleración por GPU por defecto para estabilidad gráfica de la UI
+        System.getProperties().putIfAbsent("prism.forceGPU", "true");
 
-        setupJavaFXVMOptions();
+        // Definir el orden del pipeline gráfico para mitigar bugs visuales con el backend de GTK
+        System.getProperties().putIfAbsent("prism.order", "es2,sw");
 
-        if (OperatingSystem.CURRENT_OS == OperatingSystem.MACOS) {
-            System.getProperties().putIfAbsent("apple.awt.application.appearance", "system");
-            if (!isInsideMacAppBundle())
-                initIcon();
+        // Forzar el uso de GTK 3 en entornos Linux
+        System.getProperties().putIfAbsent("jdk.gtk.version", "3");
+
+        String animationFrameRate = System.getenv("HMCL_ANIMATION_FRAME_RATE");
+        if (animationFrameRate != null) {
+            try {
+                if (Integer.parseInt(animationFrameRate) <= 0)
+                    throw new NumberFormatException(animationFrameRate);
+
+                System.getProperties().putIfAbsent("javafx.animation.pulse", animationFrameRate);
+            } catch (NumberFormatException e) {
+                LOG.warning("Invalid animation frame rate: " + animationFrameRate);
+            }
         }
+
+        checkDirectoryPath();
+
+        if (OperatingSystem.CURRENT_OS == OperatingSystem.MACOS)
+            initIcon();
 
         checkJavaFX();
         verifyJavaFX();
@@ -74,126 +87,46 @@ public final class EntryPoint {
         System.exit(exitCode);
     }
 
-    private static void setupJavaFXVMOptions() {
-        if ("true".equalsIgnoreCase(System.getenv("HMCL_FORCE_GPU"))) {
-            LOG.info("HMCL_FORCE_GPU: true");
-            System.getProperties().putIfAbsent("prism.forceGPU", "true");
-        }
-
-        String animationFrameRate = System.getenv("HMCL_ANIMATION_FRAME_RATE");
-        if (animationFrameRate != null) {
-            LOG.info("HMCL_ANIMATION_FRAME_RATE: " + animationFrameRate);
-
-            try {
-                if (Integer.parseInt(animationFrameRate) <= 0)
-                    throw new NumberFormatException(animationFrameRate);
-
-                System.getProperties().putIfAbsent("javafx.animation.pulse", animationFrameRate);
-            } catch (NumberFormatException e) {
-                LOG.warning("Invalid animation frame rate: " + animationFrameRate);
-            }
-        }
-
-        String uiScale = System.getProperty("hmcl.uiScale", System.getenv("HMCL_UI_SCALE"));
-        if (uiScale != null) {
-            uiScale = uiScale.trim();
-
-            LOG.info("HMCL_UI_SCALE: " + uiScale);
-
-            try {
-                float scaleValue;
-                if (uiScale.endsWith("%")) {
-                    scaleValue = Integer.parseInt(uiScale.substring(0, uiScale.length() - 1)) / 100.0f;
-                } else if (uiScale.endsWith("dpi") || uiScale.endsWith("DPI")) {
-                    scaleValue = Integer.parseInt(uiScale.substring(0, uiScale.length() - 3)) / 96.0f;
-                } else {
-                    scaleValue = Float.parseFloat(uiScale);
-                }
-
-                float lowerBound;
-                float upperBound;
-
-                if (OperatingSystem.CURRENT_OS == OperatingSystem.WINDOWS) {
-                    // JavaFX behavior may be abnormal when the DPI scaling factor is too high
-                    lowerBound = 0.25f;
-                    upperBound = 4f;
-                } else {
-                    lowerBound = 0.01f;
-                    upperBound = 10f;
-                }
-
-                if (scaleValue >= lowerBound && scaleValue <= upperBound) {
-                    if (OperatingSystem.CURRENT_OS == OperatingSystem.WINDOWS) {
-                        System.getProperties().putIfAbsent("glass.win.uiScale", uiScale);
-                    } else if (OperatingSystem.CURRENT_OS == OperatingSystem.MACOS) {
-                        LOG.warning("macOS does not support setting UI scale, so it will be ignored");
-                    } else {
-                        System.getProperties().putIfAbsent("glass.gtk.uiScale", uiScale);
-                    }
-                } else {
-                    LOG.warning("UI scale out of range: " + uiScale);
-                }
-            } catch (Throwable e) {
-                LOG.warning("Invalid UI scale: " + uiScale);
-            }
-        }
-    }
-
     private static void createHMCLDirectories() {
-        if (!Files.isDirectory(Metadata.HMCL_LOCAL_HOME)) {
+        if (!Files.isDirectory(Metadata.HMCL_CURRENT_DIRECTORY)) {
             try {
-                Files.createDirectories(Metadata.HMCL_LOCAL_HOME);
+                Files.createDirectories(Metadata.HMCL_CURRENT_DIRECTORY);
                 if (OperatingSystem.CURRENT_OS == OperatingSystem.WINDOWS) {
                     try {
-                        Files.setAttribute(Metadata.HMCL_LOCAL_HOME, "dos:hidden", true);
+                        Files.setAttribute(Metadata.HMCL_CURRENT_DIRECTORY, "dos:hidden", true);
                     } catch (IOException e) {
-                        LOG.warning("Failed to set hidden attribute of " + Metadata.HMCL_LOCAL_HOME, e);
+                        LOG.warning("Failed to set hidden attribute of " + Metadata.HMCL_CURRENT_DIRECTORY, e);
                     }
                 }
             } catch (IOException e) {
                 // Logger has not been started yet, so print directly to System.err
-                System.err.println("Failed to create HMCL directory: " + Metadata.HMCL_LOCAL_HOME);
+                System.err.println("Failed to create HMCL directory: " + Metadata.HMCL_CURRENT_DIRECTORY);
                 e.printStackTrace(System.err);
-                showErrorAndExit(i18n("fatal.create_hmcl_current_directory_failure", Metadata.HMCL_LOCAL_HOME));
+                showErrorAndExit(i18n("fatal.create_hmcl_current_directory_failure", Metadata.HMCL_CURRENT_DIRECTORY));
             }
         }
 
-        if (!Files.isDirectory(Metadata.HMCL_USER_HOME)) {
+        if (!Files.isDirectory(Metadata.HMCL_GLOBAL_DIRECTORY)) {
             try {
-                Files.createDirectories(Metadata.HMCL_USER_HOME);
+                Files.createDirectories(Metadata.HMCL_GLOBAL_DIRECTORY);
             } catch (IOException e) {
-                LOG.warning("Failed to create HMCL user home " + Metadata.HMCL_USER_HOME, e);
+                LOG.warning("Failed to create HMCL global directory " + Metadata.HMCL_GLOBAL_DIRECTORY, e);
             }
         }
-    }
-
-    private static boolean isInsideMacAppBundle() {
-        Path thisJar = JarUtils.thisJarPath();
-        if (thisJar == null)
-            return false;
-
-        for (Path current = thisJar.getParent();
-             current != null && current.getParent() != null;
-             current = current.getParent()
-        ) {
-            if ("Contents".equals(FileUtils.getName(current))
-                    && FileUtils.getName(current.getParent()).endsWith(".app")
-                    && Files.exists(current.resolve("Info.plist"))
-            ) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private static void initIcon() {
-        try {
-            if (java.awt.Taskbar.isTaskbarSupported()) {
-                var image = java.awt.Toolkit.getDefaultToolkit().getImage(EntryPoint.class.getResource("/assets/img/icon-mac.png"));
-                java.awt.Taskbar.getTaskbar().setIconImage(image);
-            }
-        } catch (Throwable e) {
-            LOG.warning("Failed to set application icon", e);
+        java.awt.Image image = java.awt.Toolkit.getDefaultToolkit().getImage(EntryPoint.class.getResource("/assets/img/icon-mac.png"));
+        AwtUtils.setAppleIcon(image);
+    }
+
+    private static void checkDirectoryPath() {
+        String currentDir = System.getProperty("user.dir", "");
+        if (currentDir.contains("!")) {
+            LOG.error("The current working path contains an exclamation mark: " + currentDir);
+            // No Chinese translation because both Swing and JavaFX cannot render Chinese character properly when exclamation mark exists in the path.
+            showErrorAndExit("Exclamation mark(!) is not allowed in the path where HMCL is in.\n"
+                    + "The path is " + currentDir);
         }
     }
 
@@ -203,6 +136,9 @@ public final class EntryPoint {
         } catch (SelfDependencyPatcher.PatchException e) {
             LOG.error("Unable to patch JVM", e);
             showErrorAndExit(i18n("fatal.javafx.missing"));
+        } catch (SelfDependencyPatcher.IncompatibleVersionException e) {
+            LOG.error("Unable to patch JVM", e);
+            showErrorAndExit(i18n("fatal.javafx.incompatible"));
         } catch (CancellationException e) {
             LOG.error("User cancels downloading JavaFX", e);
             exit(0);
@@ -220,20 +156,6 @@ public final class EntryPoint {
         } catch (Exception e) {
             LOG.warning("JavaFX is incomplete or not found", e);
             showErrorAndExit(i18n("fatal.javafx.incomplete"));
-        }
-    }
-
-    private static void checkWine() {
-        if (OperatingSystem.isRunningUnderWine()) {
-            SwingUtils.initLookAndFeel();
-            LOG.warning("HMCL is running under Wine or its distributions!");
-
-            int result = JOptionPane.showOptionDialog(null, i18n("fatal.wine_warning"), i18n("message.warning"), JOptionPane.OK_CANCEL_OPTION,
-                    JOptionPane.WARNING_MESSAGE, null, null, null);
-
-            if (result == JOptionPane.CANCEL_OPTION || result == JOptionPane.CLOSED_OPTION) {
-                exit(1);
-            }
         }
     }
 

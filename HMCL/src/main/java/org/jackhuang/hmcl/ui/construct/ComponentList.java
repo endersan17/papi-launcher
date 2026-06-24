@@ -17,8 +17,13 @@
  */
 package org.jackhuang.hmcl.ui.construct;
 
-import javafx.beans.InvalidationListener;
+import javafx.beans.DefaultProperty;
 import javafx.beans.binding.Bindings;
+import javafx.beans.binding.ObjectBinding;
+import javafx.beans.property.IntegerProperty;
+import javafx.beans.property.SimpleIntegerProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.css.PseudoClass;
@@ -28,19 +33,86 @@ import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Control;
 import javafx.scene.control.Label;
-import javafx.scene.layout.*;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.VBox;
 import org.jackhuang.hmcl.util.javafx.MappedObservableList;
 
-public class ComponentList extends Control implements NoPaddingComponent {
+import java.util.List;
+import java.util.function.Supplier;
+
+@DefaultProperty("content")
+public class ComponentList extends Control {
+    private final StringProperty title = new SimpleStringProperty(this, "title", "Group");
+    private final StringProperty subtitle = new SimpleStringProperty(this, "subtitle", "");
+    private final IntegerProperty depth = new SimpleIntegerProperty(this, "depth", 0);
+    private boolean hasSubtitle = false;
+    public final ObservableList<Node> content = FXCollections.observableArrayList();
+    private Supplier<List<? extends Node>> lazyInitializer;
 
     public ComponentList() {
         getStyleClass().add("options-list");
     }
 
-    private final ObservableList<Node> content = FXCollections.observableArrayList();
+    public ComponentList(Supplier<List<? extends Node>> lazyInitializer) {
+        this();
+        this.lazyInitializer = lazyInitializer;
+    }
+
+    public String getTitle() {
+        return title.get();
+    }
+
+    public StringProperty titleProperty() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title.set(title);
+    }
+
+    public String getSubtitle() {
+        return subtitle.get();
+    }
+
+    public StringProperty subtitleProperty() {
+        return subtitle;
+    }
+
+    public void setSubtitle(String subtitle) {
+        this.subtitle.set(subtitle);
+    }
+
+    public int getDepth() {
+        return depth.get();
+    }
+
+    public IntegerProperty depthProperty() {
+        return depth;
+    }
+
+    public void setDepth(int depth) {
+        this.depth.set(depth);
+    }
+
+    public boolean isHasSubtitle() {
+        return hasSubtitle;
+    }
+
+    public void setHasSubtitle(boolean hasSubtitle) {
+        this.hasSubtitle = hasSubtitle;
+    }
 
     public ObservableList<Node> getContent() {
         return content;
+    }
+
+    void doLazyInit() {
+        if (lazyInitializer != null) {
+            this.getContent().setAll(lazyInitializer.get());
+            setNeedsLayout(true);
+            lazyInitializer = null;
+        }
     }
 
     @Override
@@ -58,71 +130,48 @@ public class ComponentList extends Control implements NoPaddingComponent {
         private static final PseudoClass PSEUDO_CLASS_LAST = PseudoClass.getPseudoClass("last");
 
         private final ObservableList<Node> list;
+        private final ObjectBinding<Node> firstItem;
+        private final ObjectBinding<Node> lastItem;
 
         Skin(ComponentList control) {
             super(control);
 
             list = MappedObservableList.create(control.getContent(), node -> {
-                Pane wrapper;
-                if (node instanceof ComponentSublist sublist) {
-                    sublist.getStyleClass().remove("options-list");
-                    sublist.getStyleClass().add("options-sublist");
-                    wrapper = new ComponentSublistWrapper(sublist);
-                } else {
-                    wrapper = new ItemWrapper(node);
+                ComponentListCell cell = new ComponentListCell(node);
+                cell.getStyleClass().add("options-list-item");
+                if (node.getProperties().containsKey("ComponentList.vgrow")) {
+                    VBox.setVgrow(cell, (Priority) node.getProperties().get("ComponentList.vgrow"));
                 }
-
-                wrapper.getStyleClass().add("options-list-item");
-
-                if (node.getProperties().get("ComponentList.vgrow") instanceof Priority priority) {
-                    VBox.setVgrow(wrapper, priority);
+                if (node.getProperties().containsKey("ComponentList.noPadding")) {
+                    cell.getStyleClass().add("no-padding");
                 }
-
-                if (node instanceof NoPaddingComponent || node.getProperties().containsKey("ComponentList.noPadding")) {
-                    wrapper.getStyleClass().add("no-padding");
-                }
-                return wrapper;
+                return cell;
             });
 
-            updateStyle();
-            list.addListener((InvalidationListener) o -> updateStyle());
+            firstItem = Bindings.valueAt(list, 0);
+            firstItem.addListener((observable, oldValue, newValue) -> {
+                if (newValue != null)
+                    newValue.pseudoClassStateChanged(PSEUDO_CLASS_FIRST, true);
+                if (oldValue != null)
+                    oldValue.pseudoClassStateChanged(PSEUDO_CLASS_FIRST, false);
+            });
+            if (!list.isEmpty())
+                list.get(0).pseudoClassStateChanged(PSEUDO_CLASS_FIRST, true);
+
+            lastItem = Bindings.valueAt(list, Bindings.subtract(Bindings.size(list), 1));
+            lastItem.addListener((observable, oldValue, newValue) -> {
+                if (newValue != null)
+                    newValue.pseudoClassStateChanged(PSEUDO_CLASS_LAST, true);
+                if (oldValue != null)
+                    oldValue.pseudoClassStateChanged(PSEUDO_CLASS_LAST, false);
+            });
+            if (!list.isEmpty())
+                list.get(list.size() - 1).pseudoClassStateChanged(PSEUDO_CLASS_LAST, true);
 
             VBox vbox = new VBox();
             vbox.setFillWidth(true);
             Bindings.bindContent(vbox.getChildren(), list);
             node = vbox;
-        }
-
-        private Node prevFirstItem;
-        private Node prevLastItem;
-
-        private void updateStyle() {
-            Node firstItem;
-            Node lastItem;
-
-            if (list.isEmpty()) {
-                firstItem = null;
-                lastItem = null;
-            } else {
-                firstItem = list.get(0);
-                lastItem = list.get(list.size() - 1);
-            }
-
-            if (firstItem != prevFirstItem) {
-                if (prevFirstItem != null)
-                    prevFirstItem.pseudoClassStateChanged(PSEUDO_CLASS_FIRST, false);
-                if (firstItem != null)
-                    firstItem.pseudoClassStateChanged(PSEUDO_CLASS_FIRST, true);
-                prevFirstItem = firstItem;
-            }
-
-            if (lastItem != prevLastItem) {
-                if (prevLastItem != null)
-                    prevLastItem.pseudoClassStateChanged(PSEUDO_CLASS_LAST, false);
-                if (lastItem != null)
-                    lastItem.pseudoClassStateChanged(PSEUDO_CLASS_LAST, true);
-                prevLastItem = lastItem;
-            }
         }
     }
 
@@ -139,27 +188,5 @@ public class ComponentList extends Control implements NoPaddingComponent {
 
     public static void setVgrow(Node node, Priority priority) {
         node.getProperties().put("ComponentList.vgrow", priority);
-    }
-
-    public static void setNoPadding(Node node) {
-        node.getProperties().put("ComponentList.noPadding", true);
-    }
-
-    /// Wrapper for a component list row.
-    private static final class ItemWrapper extends StackPane {
-        /// The row content displayed by this wrapper.
-        private final Node content;
-
-        /// Creates a row wrapper for the given content node.
-        private ItemWrapper(Node content) {
-            super(content);
-            this.content = content;
-        }
-
-        /// Propagates the child content bias so wrapped text can compute height from row width.
-        @Override
-        public Orientation getContentBias() {
-            return content.getContentBias();
-        }
     }
 }

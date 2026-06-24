@@ -43,22 +43,16 @@ public class ServerModpackExportTask extends Task<Void> {
     private final DefaultGameRepository repository;
     private final String versionId;
     private final ModpackExportInfo exportInfo;
-    private final Path modpackFile;
+    private final File modpackFile;
 
-    public ServerModpackExportTask(DefaultGameRepository repository, String version, ModpackExportInfo exportInfo, Path modpackFile) {
+    public ServerModpackExportTask(DefaultGameRepository repository, String version, ModpackExportInfo exportInfo, File modpackFile) {
         this.repository = repository;
         this.versionId = version;
         this.exportInfo = exportInfo.validate();
         this.modpackFile = modpackFile;
 
         onDone().register(event -> {
-            if (event.isFailed()) {
-                try {
-                    Files.deleteIfExists(modpackFile);
-                } catch (IOException e) {
-                    LOG.warning("Failed to delete modpack file: " + modpackFile, e);
-                }
-            }
+            if (event.isFailed()) modpackFile.delete();
         });
     }
 
@@ -68,8 +62,8 @@ public class ServerModpackExportTask extends Task<Void> {
         blackList.add(versionId + ".jar");
         blackList.add(versionId + ".json");
         LOG.info("Compressing game files without some files in blacklist, including files or directories: usernamecache.json, asm, logs, backups, versions, assets, usercache.json, libraries, crash-reports, launcher_profiles.json, NVIDIA, TCNodeTracker");
-        try (Zipper zip = new Zipper(modpackFile)) {
-            Path runDirectory = repository.getRunDirectory(versionId);
+        try (Zipper zip = new Zipper(modpackFile.toPath())) {
+            Path runDirectory = repository.getRunDirectory(versionId).toPath();
             List<ModpackConfiguration.FileInformation> files = new ArrayList<>();
             zip.putDirectory(runDirectory, "overrides", path -> {
                 if (Modpack.acceptFile(path, blackList, exportInfo.getWhitelist())) {
@@ -107,6 +101,5 @@ public class ServerModpackExportTask extends Task<Void> {
     }
 
     public static final ModpackExportInfo.Options OPTION = new ModpackExportInfo.Options()
-            .requireAuthor()
             .requireFileApi(false);
 }

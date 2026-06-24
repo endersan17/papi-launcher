@@ -22,115 +22,140 @@ import com.google.gson.annotations.JsonAdapter;
 import javafx.application.Platform;
 import javafx.beans.InvalidationListener;
 import javafx.beans.Observable;
-import javafx.beans.property.ObjectProperty;
-import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.*;
 import org.jackhuang.hmcl.download.DefaultDependencyManager;
 import org.jackhuang.hmcl.download.DownloadProvider;
+import org.jackhuang.hmcl.event.EventBus;
+import org.jackhuang.hmcl.event.EventPriority;
+import org.jackhuang.hmcl.event.RefreshedVersionsEvent;
 import org.jackhuang.hmcl.game.HMCLCacheRepository;
 import org.jackhuang.hmcl.game.HMCLGameRepository;
-import org.jackhuang.hmcl.util.PortablePath;
+import org.jackhuang.hmcl.game.Version;
+import org.jackhuang.hmcl.ui.WeakListenerHolder;
 import org.jackhuang.hmcl.util.ToStringBuilder;
-import org.jackhuang.hmcl.util.i18n.LocalizedText;
 import org.jackhuang.hmcl.util.javafx.ObservableHelper;
-import org.jetbrains.annotations.NotNullByDefault;
-import org.jetbrains.annotations.Nullable;
 
+import java.io.File;
 import java.lang.reflect.Type;
-import java.util.Objects;
+import java.util.Optional;
 
 import static org.jackhuang.hmcl.ui.FXUtils.onInvalidating;
+import static org.jackhuang.hmcl.ui.FXUtils.runInFX;
 
 /**
  *
  * @author huangyuhui
  */
 @JsonAdapter(Profile.Serializer.class)
-@NotNullByDefault
 public final class Profile implements Observable {
+    private final WeakListenerHolder listenerHolder = new WeakListenerHolder();
     private final HMCLGameRepository repository;
 
-    /// The stable game directory ID.
-    private final GameDirectoryID id;
+    private final StringProperty selectedVersion = new SimpleStringProperty();
 
-    /// Returns the stable game directory ID.
-    public GameDirectoryID getId() {
-        return id;
+    public StringProperty selectedVersionProperty() {
+        return selectedVersion;
     }
 
-    /// The game directory path.
-    private final ObjectProperty<PortablePath> path;
-
-    /// Returns the game directory path property.
-    public ObjectProperty<PortablePath> pathProperty() {
-        return path;
+    public String getSelectedVersion() {
+        return selectedVersion.get();
     }
 
-    /// Returns the game directory path.
-    public PortablePath getPath() {
-        return path.get();
+    public void setSelectedVersion(String selectedVersion) {
+        this.selectedVersion.set(selectedVersion);
     }
 
-    /// Sets the game directory path.
-    public void setPath(PortablePath path) {
-        this.path.set(Objects.requireNonNull(path));
+    private final ObjectProperty<File> gameDir;
+
+    public ObjectProperty<File> gameDirProperty() {
+        return gameDir;
     }
 
-    /// The custom localized profile name, or `null` for profiles without a stored name.
-    private final ObjectProperty<@Nullable LocalizedText> name;
+    public File getGameDir() {
+        return gameDir.get();
+    }
 
-    /// Returns the custom localized profile name property.
-    public ObjectProperty<@Nullable LocalizedText> nameProperty() {
+    public void setGameDir(File gameDir) {
+        this.gameDir.set(gameDir);
+    }
+
+    private final ReadOnlyObjectWrapper<VersionSetting> global = new ReadOnlyObjectWrapper<>(this, "global");
+
+    public ReadOnlyObjectProperty<VersionSetting> globalProperty() {
+        return global.getReadOnlyProperty();
+    }
+
+    public VersionSetting getGlobal() {
+        return global.get();
+    }
+
+    private final SimpleStringProperty name;
+
+    public StringProperty nameProperty() {
         return name;
     }
 
-    /// Returns the custom localized profile name, or `null` when no name is stored.
-    public @Nullable LocalizedText getName() {
+    public String getName() {
         return name.get();
     }
 
-    /// Sets the custom localized profile name.
-    public void setName(@Nullable LocalizedText name) {
+    public void setName(String name) {
         this.name.set(name);
     }
 
-    /// The migrated legacy game settings preset ID, or `null` when this profile uses the default preset.
-    private final ObjectProperty<@Nullable GameSettingsPresetID> legacyGameSettings;
+    private BooleanProperty useRelativePath = new SimpleBooleanProperty(this, "useRelativePath", false);
 
-    /// Returns the migrated legacy game settings preset ID property.
-    public ObjectProperty<@Nullable GameSettingsPresetID> legacyGameSettingsProperty() {
-        return legacyGameSettings;
+    public BooleanProperty useRelativePathProperty() {
+        return useRelativePath;
     }
 
-    /// Returns the migrated legacy game settings preset ID, or `null` when this profile uses the default preset.
-    public @Nullable GameSettingsPresetID getLegacyGameSettings() {
-        return legacyGameSettings.get();
+    public boolean isUseRelativePath() {
+        return useRelativePath.get();
     }
 
-    /// Sets the migrated legacy game settings preset ID.
-    public void setLegacyGameSettings(@Nullable GameSettingsPresetID legacyGameSettings) {
-        this.legacyGameSettings.set(legacyGameSettings);
+    public void setUseRelativePath(boolean useRelativePath) {
+        this.useRelativePath.set(useRelativePath);
     }
 
-    /// Creates a profile.
-    public Profile(GameDirectoryID id, @Nullable LocalizedText name, PortablePath path) {
-        this(id, name, path, null);
+    public Profile(String name) {
+        this(name, new File(".minecraft"));
     }
 
-    /// Creates a profile.
-    public Profile(
-            GameDirectoryID id,
-            @Nullable LocalizedText name,
-            PortablePath path,
-            @Nullable GameSettingsPresetID legacyGameSettings) {
-        this.id = Objects.requireNonNull(id);
-        this.name = new SimpleObjectProperty<>(this, "name", name);
-        this.path = new SimpleObjectProperty<>(this, "path", Objects.requireNonNull(path));
-        this.legacyGameSettings = new SimpleObjectProperty<>(this, "legacyGameSettings", legacyGameSettings);
-        repository = new HMCLGameRepository(this, path.toPath());
+    public Profile(String name, File initialGameDir) {
+        this(name, initialGameDir, new VersionSetting());
+    }
 
-        this.path.addListener((a, b, newValue) -> repository.changeDirectory(newValue.toPath()));
+    public Profile(String name, File initialGameDir, VersionSetting global) {
+        this(name, initialGameDir, global, null, false);
+    }
+
+    public Profile(String name, File initialGameDir, VersionSetting global, String selectedVersion, boolean useRelativePath) {
+        this.name = new SimpleStringProperty(this, "name", name);
+        gameDir = new SimpleObjectProperty<>(this, "gameDir", initialGameDir);
+        repository = new HMCLGameRepository(this, initialGameDir);
+        this.global.set(global == null ? new VersionSetting() : global);
+        this.selectedVersion.set(selectedVersion);
+        this.useRelativePath.set(useRelativePath);
+
+        gameDir.addListener((a, b, newValue) -> repository.changeDirectory(newValue));
+        this.selectedVersion.addListener(o -> checkSelectedVersion());
+        listenerHolder.add(EventBus.EVENT_BUS.channel(RefreshedVersionsEvent.class).registerWeak(event -> checkSelectedVersion(), EventPriority.HIGHEST));
 
         addPropertyChangedListener(onInvalidating(this::invalidate));
+    }
+
+    private void checkSelectedVersion() {
+        runInFX(() -> {
+            if (!repository.isLoaded()) return;
+            String newValue = selectedVersion.get();
+            if (!repository.hasVersion(newValue)) {
+                Optional<String> version = repository.getVersions().stream().findFirst().map(Version::getId);
+                if (version.isPresent())
+                    selectedVersion.setValue(version.get());
+                else if (newValue != null)
+                    selectedVersion.setValue(null);
+            }
+        });
     }
 
     public HMCLGameRepository getRepository() {
@@ -145,21 +170,29 @@ public final class Profile implements Observable {
         return new DefaultDependencyManager(repository, downloadProvider, HMCLCacheRepository.REPOSITORY);
     }
 
+    public VersionSetting getVersionSetting(String id) {
+        return repository.getVersionSetting(id);
+    }
+
     @Override
     public String toString() {
         return new ToStringBuilder(this)
-                .append("path", getPath())
+                .append("gameDir", getGameDir())
                 .append("name", getName())
+                .append("useRelativePath", isUseRelativePath())
                 .toString();
     }
 
     private void addPropertyChangedListener(InvalidationListener listener) {
         name.addListener(listener);
-        path.addListener(listener);
-        legacyGameSettings.addListener(listener);
+        global.addListener(listener);
+        gameDir.addListener(listener);
+        useRelativePath.addListener(listener);
+        global.get().addListener(listener);
+        selectedVersion.addListener(listener);
     }
 
-    private final ObservableHelper observableHelper = new ObservableHelper(this);
+    private ObservableHelper observableHelper = new ObservableHelper(this);
 
     @Override
     public void addListener(InvalidationListener listener) {
@@ -171,59 +204,54 @@ public final class Profile implements Observable {
         observableHelper.removeListener(listener);
     }
 
-    /// Notifies profile observers on the JavaFX thread when the toolkit is available.
     private void invalidate() {
-        try {
-            Platform.runLater(observableHelper::invalidate);
-        } catch (IllegalStateException e) {
-            observableHelper.invalidate();
-        }
+        Platform.runLater(observableHelper::invalidate);
     }
 
-    public record ProfileVersion(Profile profile, @Nullable String version) {
+    public static class ProfileVersion {
+        private final Profile profile;
+        private final String version;
+
+        public ProfileVersion(Profile profile, String version) {
+            this.profile = profile;
+            this.version = version;
+        }
+
+        public Profile getProfile() {
+            return profile;
+        }
+
+        public String getVersion() {
+            return version;
+        }
     }
 
     public static final class Serializer implements JsonSerializer<Profile>, JsonDeserializer<Profile> {
         @Override
-        public JsonElement serialize(@Nullable Profile src, Type typeOfSrc, JsonSerializationContext context) {
+        public JsonElement serialize(Profile src, Type typeOfSrc, JsonSerializationContext context) {
             if (src == null)
                 return JsonNull.INSTANCE;
 
             JsonObject jsonObject = new JsonObject();
-            jsonObject.add("id", context.serialize(src.getId(), GameDirectoryID.class));
-            if (src.getName() != null) {
-                JsonElement name = context.serialize(src.getName(), LocalizedText.class);
-                if (name != null && !name.isJsonNull()) {
-                    jsonObject.add("name", name);
-                }
-            }
-            jsonObject.add("path", context.serialize(src.getPath(), PortablePath.class));
-            if (src.getLegacyGameSettings() != null) {
-                jsonObject.add("legacyGameSettings", context.serialize(src.getLegacyGameSettings(), GameSettingsPresetID.class));
-            }
+            jsonObject.add("global", context.serialize(src.getGlobal()));
+            jsonObject.addProperty("gameDir", src.getGameDir().getPath());
+            jsonObject.addProperty("useRelativePath", src.isUseRelativePath());
+            jsonObject.addProperty("selectedMinecraftVersion", src.getSelectedVersion());
 
             return jsonObject;
         }
 
         @Override
-        public @Nullable Profile deserialize(@Nullable JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
-            if (!(json instanceof JsonObject obj)) return null;
-            GameDirectoryID id = context.deserialize(obj.get("id"), GameDirectoryID.class);
-            if (id == null) {
-                throw new JsonParseException("Game directory ID cannot be null");
-            } else if (GameDirectoryID.NIL.equals(id)) {
-                throw new JsonParseException("Game directory ID cannot be nil");
-            }
-            PortablePath path = context.deserialize(obj.get("path"), PortablePath.class);
-            if (path == null) {
-                throw new JsonParseException("Profile path cannot be null");
-            }
-            @Nullable LocalizedText name = context.deserialize(obj.get("name"), LocalizedText.class);
+        public Profile deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
+            if (json == JsonNull.INSTANCE || !(json instanceof JsonObject)) return null;
+            JsonObject obj = (JsonObject) json;
+            String gameDir = Optional.ofNullable(obj.get("gameDir")).map(JsonElement::getAsString).orElse("");
 
-            return new Profile(id,
-                    name,
-                    path,
-                    context.deserialize(obj.get("legacyGameSettings"), GameSettingsPresetID.class));
+            return new Profile("Default",
+                    new File(gameDir),
+                    context.deserialize(obj.get("global"), VersionSetting.class),
+                    Optional.ofNullable(obj.get("selectedMinecraftVersion")).map(JsonElement::getAsString).orElse(""),
+                    Optional.ofNullable(obj.get("useRelativePath")).map(JsonElement::getAsBoolean).orElse(false));
         }
 
     }

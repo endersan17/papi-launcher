@@ -18,7 +18,6 @@
 package org.jackhuang.hmcl.ui.versions;
 
 import com.jfoenix.controls.JFXButton;
-import javafx.beans.property.BooleanProperty;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -26,26 +25,24 @@ import javafx.scene.Node;
 import javafx.scene.control.Control;
 import javafx.scene.control.Skin;
 import javafx.scene.control.SkinBase;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import org.jackhuang.hmcl.game.World;
 import org.jackhuang.hmcl.game.WorldLockedException;
+import org.jackhuang.hmcl.setting.Theme;
 import org.jackhuang.hmcl.task.Schedulers;
 import org.jackhuang.hmcl.task.Task;
 import org.jackhuang.hmcl.ui.*;
-import org.jackhuang.hmcl.ui.construct.ImageContainer;
 import org.jackhuang.hmcl.ui.construct.MessageDialogPane;
 import org.jackhuang.hmcl.ui.construct.RipplerContainer;
 import org.jackhuang.hmcl.ui.construct.TwoLineListItem;
 import org.jackhuang.hmcl.util.Pair;
 import org.jackhuang.hmcl.util.StringUtils;
-import org.jackhuang.hmcl.util.TaskCancellationAction;
-import org.jackhuang.hmcl.util.i18n.I18n;
 import org.jetbrains.annotations.NotNull;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.nio.file.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -64,18 +61,18 @@ import static org.jackhuang.hmcl.util.logging.Logger.LOG;
 /**
  * @author Glavo
  */
-public final class WorldBackupsPage extends ListPageBase<WorldBackupsPage.BackupInfo> implements WorldManagePage.WorldRefreshable {
+public final class WorldBackupsPage extends ListPageBase<WorldBackupsPage.BackupInfo> {
     static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss");
 
     private final World world;
     private final Path backupsDir;
-    private final BooleanProperty readOnly;
+    private final boolean isReadOnly;
     private final Pattern backupFileNamePattern;
 
     public WorldBackupsPage(WorldManagePage worldManagePage) {
         this.world = worldManagePage.getWorld();
         this.backupsDir = worldManagePage.getBackupsDir();
-        this.readOnly = worldManagePage.readOnlyProperty();
+        this.isReadOnly = worldManagePage.isReadOnly();
         this.backupFileNamePattern = Pattern.compile("(?<datetime>[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}-[0-9]{2})_" + Pattern.quote(world.getFileName()) + "( (?<count>[0-9]+))?\\.zip");
 
         refresh();
@@ -150,15 +147,15 @@ public final class WorldBackupsPage extends ListPageBase<WorldBackupsPage.Backup
                 WorldBackupsPage.this.getItems().sort(Comparator.naturalOrder());
                 Controllers.dialog(i18n("world.backup.create.success", result.getKey()), null, MessageDialogPane.MessageType.INFO);
             } else if (exception instanceof WorldLockedException) {
-                Controllers.dialog(i18n("world.locked.failed"), null, MessageDialogPane.MessageType.WARNING);
+                Controllers.dialog(i18n("world.backup.create.locked"), null, MessageDialogPane.MessageType.WARNING);
             } else {
                 LOG.warning("Failed to create backup", exception);
                 Controllers.dialog(i18n("world.backup.create.failed", StringUtils.getStackTrace(exception)), null, MessageDialogPane.MessageType.WARNING);
             }
-        }), i18n("world.backup"), TaskCancellationAction.NO_CANCEL);
+        }), i18n("world.backup"), null);
     }
 
-    private final class WorldBackupsPageSkin extends ToolbarListPageSkin<BackupInfo, WorldBackupsPage> {
+    private final class WorldBackupsPageSkin extends ToolbarListPageSkin<WorldBackupsPage> {
 
         WorldBackupsPageSkin() {
             super(WorldBackupsPage.this);
@@ -167,7 +164,7 @@ public final class WorldBackupsPage extends ListPageBase<WorldBackupsPage.Backup
         @Override
         protected List<Node> initializeToolbar(WorldBackupsPage skinnable) {
             JFXButton createBackup = createToolbarButton2(i18n("world.backup.create.new_one"), SVG.ARCHIVE, skinnable::createBackup);
-            createBackup.disableProperty().bind(getSkinnable().readOnly);
+            createBackup.setDisable(isReadOnly);
 
             return Arrays.asList(
                     createToolbarButton2(i18n("button.refresh"), SVG.REFRESH, skinnable::refresh),
@@ -234,8 +231,9 @@ public final class WorldBackupsPage extends ListPageBase<WorldBackupsPage.Backup
                 root.setLeft(left);
                 left.setPadding(new Insets(0, 8, 0, 0));
 
-                var imageView = new ImageContainer(32);
+                ImageView imageView = new ImageView();
                 left.getChildren().add(imageView);
+                FXUtils.limitSize(imageView, 32, 32);
                 imageView.setImage(world.getIcon() == null ? FXUtils.newBuiltinImage("/assets/img/unknown_server.png") : world.getIcon());
             }
 
@@ -247,8 +245,7 @@ public final class WorldBackupsPage extends ListPageBase<WorldBackupsPage.Backup
                     item.setTitle(parseColorEscapes(skinnable.getBackupWorld().getWorldName()));
                 item.setSubtitle(formatDateTime(skinnable.getBackupTime()) + (skinnable.count == 0 ? "" : " (" + skinnable.count + ")"));
 
-                if (world.getGameVersion() != null)
-                    item.addTag(I18n.getDisplayVersion(world.getGameVersion()));
+                if (world.getGameVersion() != null) item.getTags().add(world.getGameVersion());
             }
 
             {
@@ -256,14 +253,18 @@ public final class WorldBackupsPage extends ListPageBase<WorldBackupsPage.Backup
                 root.setRight(right);
                 right.setAlignment(Pos.CENTER_RIGHT);
 
-                JFXButton btnReveal = FXUtils.newToggleButton4(SVG.FOLDER_OPEN);
+                JFXButton btnReveal = new JFXButton();
                 right.getChildren().add(btnReveal);
                 FXUtils.installFastTooltip(btnReveal, i18n("reveal.in_file_manager"));
+                btnReveal.getStyleClass().add("toggle-icon4");
+                btnReveal.setGraphic(SVG.FOLDER_OPEN.createIcon(Theme.blackFill(), -1));
                 btnReveal.setOnAction(event -> skinnable.onReveal());
 
-                JFXButton btnDelete = FXUtils.newToggleButton4(SVG.DELETE_FOREVER);
+                JFXButton btnDelete = new JFXButton();
                 right.getChildren().add(btnDelete);
                 FXUtils.installFastTooltip(btnDelete, i18n("world.backup.delete"));
+                btnDelete.getStyleClass().add("toggle-icon4");
+                btnDelete.setGraphic(SVG.DELETE.createIcon(Theme.blackFill(), -1));
                 btnDelete.setOnAction(event -> Controllers.confirm(i18n("button.remove.confirm"), i18n("button.remove"), skinnable::onDelete, null));
             }
 

@@ -25,14 +25,12 @@ import org.jackhuang.hmcl.game.LibrariesDownloadInfo;
 import org.jackhuang.hmcl.game.Library;
 import org.jackhuang.hmcl.game.LibraryDownloadInfo;
 import org.jackhuang.hmcl.util.Immutable;
-import org.jackhuang.hmcl.util.gson.JsonSerializable;
 
 import java.util.List;
 import java.util.Map;
 
 @Immutable
-@JsonSerializable
-public final class TLauncherLibrary {
+public class TLauncherLibrary {
 
     @SerializedName("name")
     private final Artifact name;

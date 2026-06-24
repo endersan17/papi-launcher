@@ -17,7 +17,6 @@
  */
 package org.jackhuang.hmcl.auth.authlibinjector;
 
-import com.google.gson.JsonObject;
 import org.jackhuang.hmcl.auth.*;
 import org.jackhuang.hmcl.auth.yggdrasil.CompleteGameProfile;
 import org.jackhuang.hmcl.auth.yggdrasil.TextureType;
@@ -47,13 +46,8 @@ public class AuthlibInjectorAccount extends YggdrasilAccount {
         this.downloader = downloader;
     }
 
-    public AuthlibInjectorAccount(
-            AccountID accountID,
-            AuthlibInjectorServer server,
-            AuthlibInjectorArtifactProvider downloader,
-            String username,
-            YggdrasilSession session) {
-        super(accountID, server.getYggdrasilService(), username, session);
+    public AuthlibInjectorAccount(AuthlibInjectorServer server, AuthlibInjectorArtifactProvider downloader, String username, YggdrasilSession session) {
+        super(server.getYggdrasilService(), username, session);
         this.server = server;
         this.downloader = downloader;
     }
@@ -143,9 +137,10 @@ public class AuthlibInjectorAccount extends YggdrasilAccount {
     }
 
     @Override
-    public void writeMetadata(JsonObject metadata) {
-        metadata.addProperty("serverBaseURL", server.getUrl());
-        super.writeMetadata(metadata);
+    public Map<Object, Object> toStorage() {
+        Map<Object, Object> map = super.toStorage();
+        map.put("serverBaseURL", server.getUrl());
+        return map;
     }
 
     @Override
@@ -159,11 +154,29 @@ public class AuthlibInjectorAccount extends YggdrasilAccount {
     }
 
     @Override
+    public String getIdentifier() {
+        return server.getUrl() + ":" + super.getIdentifier();
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(super.hashCode(), server.hashCode());
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == null || obj.getClass() != AuthlibInjectorAccount.class)
+            return false;
+        AuthlibInjectorAccount another = (AuthlibInjectorAccount) obj;
+        return isPortable() == another.isPortable()
+                && characterUUID.equals(another.characterUUID) && server.equals(another.server);
+    }
+
+    @Override
     public String toString() {
         return new ToStringBuilder(this)
-                .append("accountID", getAccountID())
-                .append("profileID", profileID)
-                .append("loginName", getLoginName())
+                .append("uuid", characterUUID)
+                .append("username", getUsername())
                 .append("server", getServer().getUrl())
                 .toString();
     }

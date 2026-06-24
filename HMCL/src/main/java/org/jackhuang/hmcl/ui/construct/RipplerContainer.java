@@ -18,13 +18,19 @@
 package org.jackhuang.hmcl.ui.construct;
 
 import com.jfoenix.controls.JFXRippler;
+import javafx.animation.Interpolator;
 import javafx.animation.Transition;
+import javafx.beans.DefaultProperty;
+import javafx.beans.InvalidationListener;
+import javafx.beans.NamedArg;
+import javafx.beans.binding.Bindings;
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleObjectProperty;
 import javafx.css.*;
-import javafx.css.converter.PaintConverter;
-import javafx.event.EventHandler;
 import javafx.geometry.Insets;
 import javafx.scene.Node;
-import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.Background;
 import javafx.scene.layout.BackgroundFill;
 import javafx.scene.layout.CornerRadii;
@@ -32,41 +38,37 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
 import javafx.scene.shape.Rectangle;
-import org.jackhuang.hmcl.theme.Themes;
+import javafx.util.Duration;
 import org.jackhuang.hmcl.ui.animation.AnimationUtils;
-import org.jackhuang.hmcl.ui.animation.Motion;
+import org.jackhuang.hmcl.util.Lang;
 
-import java.util.ArrayList;
 import java.util.List;
 
+@DefaultProperty("container")
 public class RipplerContainer extends StackPane {
     private static final String DEFAULT_STYLE_CLASS = "rippler-container";
-    private static final CornerRadii DEFAULT_RADII = new CornerRadii(3);
-    private static final Color DEFAULT_RIPPLER_FILL = Color.rgb(0, 200, 255);
+    private static final Duration DURATION = Duration.millis(200);
 
-    private final Node container;
+    private final ObjectProperty<Node> container = new SimpleObjectProperty<>(this, "container", null);
+    private final StyleableObjectProperty<Paint> ripplerFill = new SimpleStyleableObjectProperty<>(StyleableProperties.RIPPLER_FILL,this, "ripplerFill", null);
+    private final BooleanProperty selected = new SimpleBooleanProperty(this, "selected", false);
 
     private final StackPane buttonContainer = new StackPane();
     private final JFXRippler buttonRippler = new JFXRippler(new StackPane()) {
-        private static final Background DEFAULT_MASK_BACKGROUND = new Background(new BackgroundFill(Color.WHITE, DEFAULT_RADII, Insets.EMPTY));
-
         @Override
         protected Node getMask() {
             StackPane mask = new StackPane();
             mask.shapeProperty().bind(buttonContainer.shapeProperty());
-            mask.setBackground(DEFAULT_MASK_BACKGROUND);
-            mask.resize(
-                    buttonContainer.getWidth() - buttonContainer.snappedRightInset() - buttonContainer.snappedLeftInset(),
-                    buttonContainer.getHeight() - buttonContainer.snappedBottomInset() - buttonContainer.snappedTopInset()
-            );
+            mask.backgroundProperty().bind(Bindings.createObjectBinding(() -> new Background(new BackgroundFill(Color.WHITE, buttonContainer.getBackground() != null && buttonContainer.getBackground().getFills().size() > 0 ? buttonContainer.getBackground().getFills().get(0).getRadii() : defaultRadii, buttonContainer.getBackground() != null && buttonContainer.getBackground().getFills().size() > 0 ? buttonContainer.getBackground().getFills().get(0).getInsets() : Insets.EMPTY)), buttonContainer.backgroundProperty()));
+            mask.resize(buttonContainer.getWidth() - buttonContainer.snappedRightInset() - buttonContainer.snappedLeftInset(), buttonContainer.getHeight() - buttonContainer.snappedBottomInset() - buttonContainer.snappedTopInset());
             return mask;
         }
     };
 
-    private Transition coverAnimation;
+    private final CornerRadii defaultRadii = new CornerRadii(3);
 
-    public RipplerContainer(Node container) {
-        this.container = container;
+    public RipplerContainer(@NamedArg("container") Node container) {
+        setContainer(container);
 
         getStyleClass().add(DEFAULT_STYLE_CLASS);
         buttonRippler.setPosition(JFXRippler.RipplerPos.BACK);
@@ -83,126 +85,101 @@ public class RipplerContainer extends StackPane {
         setPickOnBounds(false);
 
         buttonContainer.setPickOnBounds(false);
+        buttonRippler.ripplerFillProperty().bind(ripplerFillProperty());
 
+        containerProperty().addListener(o -> updateChildren());
         updateChildren();
 
-        var shape = new Rectangle();
-        shape.widthProperty().bind(widthProperty());
-        shape.heightProperty().bind(heightProperty());
-        setShape(shape);
+        InvalidationListener listener = o -> {
+            if (isSelected()) setBackground(new Background(new BackgroundFill(getRipplerFill(), defaultRadii, null)));
+            else setBackground(new Background(new BackgroundFill(Color.TRANSPARENT, defaultRadii, null)));
+        };
 
-        EventHandler<MouseEvent> mouseEventHandler;
+        selectedProperty().addListener(listener);
+        selectedProperty().addListener((a, b, newValue) ->
+                pseudoClassStateChanged(PseudoClass.getPseudoClass("selected"), newValue));
+        ripplerFillProperty().addListener(listener);
+
+        setShape(Lang.apply(new Rectangle(), rectangle -> {
+            rectangle.widthProperty().bind(widthProperty());
+            rectangle.heightProperty().bind(heightProperty());
+        }));
+
         if (AnimationUtils.isAnimationEnabled()) {
-            mouseEventHandler = event -> {
-                if (coverAnimation != null) {
-                    coverAnimation.stop();
-                    coverAnimation = null;
+            setOnMouseEntered(e -> new Transition() {
+                {
+                    setCycleDuration(DURATION);
+                    setInterpolator(Interpolator.EASE_IN);
                 }
 
-                if (event.getEventType() == MouseEvent.MOUSE_ENTERED) {
-                    coverAnimation = new Transition() {
-                        {
-                            setCycleDuration(Motion.SHORT4);
-                            setInterpolator(Motion.EASE_IN);
-                        }
+                @Override
+                protected void interpolate(double frac) {
+                    interpolateBackground(frac);
+                }
+            }.play());
 
-                        @Override
-                        protected void interpolate(double frac) {
-                            interpolateBackground(frac);
-                        }
-                    };
-                } else {
-                    coverAnimation = new Transition() {
-                        {
-                            setCycleDuration(Motion.SHORT4);
-                            setInterpolator(Motion.EASE_OUT);
-                        }
-
-                        @Override
-                        protected void interpolate(double frac) {
-                            interpolateBackground(1 - frac);
-                        }
-                    };
+            setOnMouseExited(e -> new Transition() {
+                {
+                    setCycleDuration(DURATION);
+                    setInterpolator(Interpolator.EASE_OUT);
                 }
 
-                coverAnimation.play();
-            };
+                @Override
+                protected void interpolate(double frac) {
+                    interpolateBackground(1 - frac);
+                }
+            }.play());
         } else {
-            mouseEventHandler = event ->
-                    interpolateBackground(event.getEventType() == MouseEvent.MOUSE_ENTERED ? 1 : 0);
+            setOnMouseEntered(e -> interpolateBackground(1));
+            setOnMouseExited(e -> interpolateBackground(0));
         }
-
-        addEventHandler(MouseEvent.MOUSE_ENTERED, mouseEventHandler);
-        addEventHandler(MouseEvent.MOUSE_EXITED, mouseEventHandler);
     }
 
     private void interpolateBackground(double frac) {
-        if (frac < 0.01) {
-            setBackground(null);
-        } else {
-            Color onSurface = Themes.getColorScheme().getOnSurface();
-            setBackground(new Background(new BackgroundFill(
-                    Color.color(onSurface.getRed(), onSurface.getGreen(), onSurface.getBlue(), frac * 0.04),
-                    CornerRadii.EMPTY, Insets.EMPTY)));
-        }
+        setBackground(new Background(new BackgroundFill(Color.rgb(0, 0, 0, frac * 0.04), CornerRadii.EMPTY, Insets.EMPTY)));
     }
 
     protected void updateChildren() {
-        Node container = getContainer();
-        if (buttonRippler.getPosition() == JFXRippler.RipplerPos.BACK) {
-            getChildren().setAll(buttonContainer, container);
-            container.setPickOnBounds(false);
-        } else {
-            getChildren().setAll(container, buttonContainer);
-            buttonContainer.setPickOnBounds(false);
-        }
-    }
+        getChildren().addAll(buttonContainer, getContainer());
 
-    public void setPosition(JFXRippler.RipplerPos pos) {
-        buttonRippler.setPosition(pos);
-        updateChildren();
-    }
-
-    public JFXRippler getRippler() {
-        return buttonRippler;
+        for (int i = 1; i < getChildren().size(); ++i)
+            getChildren().get(i).setPickOnBounds(false);
     }
 
     public Node getContainer() {
+        return container.get();
+    }
+
+    public ObjectProperty<Node> containerProperty() {
         return container;
     }
 
-    private final StyleableObjectProperty<Paint> ripplerFill = new StyleableObjectProperty<>(DEFAULT_RIPPLER_FILL) {
-        @Override
-        public Object getBean() {
-            return RipplerContainer.this;
-        }
+    public void setContainer(Node container) {
+        this.container.set(container);
+    }
 
-        @Override
-        public String getName() {
-            return "ripplerFill";
-        }
-
-        @Override
-        public CssMetaData<? extends Styleable, Paint> getCssMetaData() {
-            return StyleableProperties.RIPPLER_FILL;
-        }
-
-        @Override
-        protected void invalidated() {
-            buttonRippler.setRipplerFill(get());
-        }
-    };
+    public Paint getRipplerFill() {
+        return ripplerFill.get();
+    }
 
     public StyleableObjectProperty<Paint> ripplerFillProperty() {
         return ripplerFill;
     }
 
-    public Paint getRipplerFill() {
-        return ripplerFillProperty().get();
+    public void setRipplerFill(Paint ripplerFill) {
+        this.ripplerFill.set(ripplerFill);
     }
 
-    public void setRipplerFill(Paint ripplerFill) {
-        ripplerFillProperty().set(ripplerFill);
+    public boolean isSelected() {
+        return selected.get();
+    }
+
+    public BooleanProperty selectedProperty() {
+        return selected;
+    }
+
+    public void setSelected(boolean selected) {
+        this.selected.set(selected);
     }
 
     @Override
@@ -211,28 +188,12 @@ public class RipplerContainer extends StackPane {
     }
 
     public static List<CssMetaData<? extends Styleable, ?>> getClassCssMetaData() {
-        return StyleableProperties.STYLEABLES;
+        return StyleableProperties.FACTORY.getCssMetaData();
     }
 
-    private final static class StyleableProperties {
-        private static final CssMetaData<RipplerContainer, Paint> RIPPLER_FILL = new CssMetaData<>("-jfx-rippler-fill", PaintConverter.getInstance(), DEFAULT_RIPPLER_FILL) {
-            @Override
-            public boolean isSettable(RipplerContainer styleable) {
-                return styleable.ripplerFill == null || !styleable.ripplerFill.isBound();
-            }
+    private static class StyleableProperties {
+        private static final StyleablePropertyFactory<RipplerContainer> FACTORY = new StyleablePropertyFactory<>(StackPane.getClassCssMetaData());
 
-            @Override
-            public StyleableProperty<Paint> getStyleableProperty(RipplerContainer styleable) {
-                return styleable.ripplerFillProperty();
-            }
-        };
-
-        private static final List<CssMetaData<? extends Styleable, ?>> STYLEABLES;
-
-        static {
-            var styleables = new ArrayList<>(StackPane.getClassCssMetaData());
-            styleables.add(RIPPLER_FILL);
-            STYLEABLES = List.copyOf(styleables);
-        }
+        private static final CssMetaData<RipplerContainer, Paint> RIPPLER_FILL = FACTORY.createPaintCssMetaData("-jfx-rippler-fill", s -> s.ripplerFill, Color.rgb(0, 200, 255));
     }
 }

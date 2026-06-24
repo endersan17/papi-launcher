@@ -1,20 +1,3 @@
-/*
- * Hello Minecraft! Launcher
- * Copyright (C) 2025 huangyuhui <huanghongxun2008@126.com> and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
 package org.jackhuang.hmcl.util.logging;
 
 import java.io.IOException;
@@ -24,16 +7,24 @@ import java.util.concurrent.CountDownLatch;
 /**
  * @author Glavo
  */
-sealed interface LogEvent {
-    record DoLog(long time,
-                 String caller,
-                 System.Logger.Level level,
-                 String message,
-                 Throwable exception
-    ) implements LogEvent {
+abstract class LogEvent {
+    static final class DoLog extends LogEvent {
+        final long time;
+        final String caller;
+        final Level level;
+        final String message;
+        final Throwable exception;
+
+        DoLog(long time, String caller, Level level, String message, Throwable exception) {
+            this.time = time;
+            this.caller = caller;
+            this.level = level;
+            this.message = message;
+            this.exception = exception;
+        }
     }
 
-    final class ExportLog implements LogEvent {
+    static final class ExportLog extends LogEvent {
         final CountDownLatch latch = new CountDownLatch(1);
 
         final OutputStream output;
@@ -48,6 +39,6 @@ sealed interface LogEvent {
         }
     }
 
-    final class Shutdown implements LogEvent {
+    static final class Shutdown extends LogEvent {
     }
 }

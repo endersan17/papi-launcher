@@ -17,15 +17,12 @@
  */
 package org.jackhuang.hmcl.mod.curse;
 
-import org.jackhuang.hmcl.download.DownloadProvider;
 import org.jackhuang.hmcl.mod.ModLoaderType;
 import org.jackhuang.hmcl.mod.RemoteMod;
 import org.jackhuang.hmcl.mod.RemoteModRepository;
 import org.jackhuang.hmcl.util.Immutable;
 import org.jackhuang.hmcl.util.Lang;
 import org.jackhuang.hmcl.util.Pair;
-import org.jackhuang.hmcl.util.StringUtils;
-import org.jackhuang.hmcl.util.versioning.GameVersionNumber;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
@@ -194,7 +191,7 @@ public class CurseAddon implements RemoteMod.IMod {
     }
 
     @Override
-    public List<RemoteMod> loadDependencies(RemoteModRepository modRepository, DownloadProvider downloadProvider) throws IOException {
+    public List<RemoteMod> loadDependencies(RemoteModRepository modRepository) throws IOException {
         Set<Integer> dependencies = latestFiles.stream()
                 .flatMap(latestFile -> latestFile.getDependencies().stream())
                 .filter(dep -> dep.getRelationType() == 3)
@@ -202,24 +199,18 @@ public class CurseAddon implements RemoteMod.IMod {
                 .collect(Collectors.toSet());
         List<RemoteMod> mods = new ArrayList<>();
         for (int dependencyId : dependencies) {
-            mods.add(modRepository.getModById(downloadProvider, Integer.toString(dependencyId)));
+            mods.add(modRepository.getModById(Integer.toString(dependencyId)));
         }
         return mods;
     }
 
     @Override
-    public Stream<RemoteMod.Version> loadVersions(RemoteModRepository modRepository, DownloadProvider downloadProvider) throws IOException {
-        return modRepository.getRemoteVersionsById(downloadProvider, Integer.toString(id));
+    public Stream<RemoteMod.Version> loadVersions(RemoteModRepository modRepository) throws IOException {
+        return modRepository.getRemoteVersionsById(Integer.toString(id));
     }
 
-    public RemoteMod toMod(RemoteModRepository.Type type) {
-        String iconUrl = "";
-        if (logo != null) {
-            if (StringUtils.isNotBlank(logo.getThumbnailUrl()))
-                iconUrl = logo.getThumbnailUrl();
-            else if (StringUtils.isNotBlank(logo.getUrl()))
-                iconUrl = logo.getUrl();
-        }
+    public RemoteMod toMod() {
+        String iconUrl = Optional.ofNullable(logo).map(Logo::getThumbnailUrl).orElse("");
 
         return new RemoteMod(
                 slug,
@@ -229,8 +220,7 @@ public class CurseAddon implements RemoteMod.IMod {
                 categories.stream().map(category -> Integer.toString(category.getId())).collect(Collectors.toList()),
                 links.websiteUrl,
                 iconUrl,
-                this,
-                type
+                this
         );
     }
 
@@ -594,12 +584,12 @@ public class CurseAddon implements RemoteMod.IMod {
                         }
                         return RemoteMod.Dependency.ofGeneral(RELATION_TYPE.get(dependency.getRelationType()), CurseForgeRemoteModRepository.MODS, Integer.toString(dependency.getModId()));
                     }).distinct().filter(Objects::nonNull).collect(Collectors.toList()),
-                    gameVersions.stream().filter(GameVersionNumber::isKnown).toList(),
+                    gameVersions.stream().filter(ver -> ver.startsWith("1.") || ver.contains("w")).collect(Collectors.toList()),
                     gameVersions.stream().flatMap(version -> {
                         if ("fabric".equalsIgnoreCase(version)) return Stream.of(ModLoaderType.FABRIC);
                         else if ("forge".equalsIgnoreCase(version)) return Stream.of(ModLoaderType.FORGE);
                         else if ("quilt".equalsIgnoreCase(version)) return Stream.of(ModLoaderType.QUILT);
-                        else if ("neoforge".equalsIgnoreCase(version)) return Stream.of(ModLoaderType.NEO_FORGE);
+                        else if ("neoforge".equalsIgnoreCase(version)) return Stream.of(ModLoaderType.NEO_FORGED);
                         else return Stream.empty();
                     }).collect(Collectors.toList())
             );

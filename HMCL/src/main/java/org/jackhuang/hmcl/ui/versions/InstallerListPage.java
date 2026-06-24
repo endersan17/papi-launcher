@@ -33,7 +33,7 @@ import org.jackhuang.hmcl.ui.download.UpdateInstallerWizardProvider;
 import org.jackhuang.hmcl.util.TaskCancellationAction;
 import org.jackhuang.hmcl.util.io.FileUtils;
 
-import java.nio.file.Path;
+import java.io.File;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -76,12 +76,12 @@ public class InstallerListPage extends ListPageBase<InstallerItem> implements Ve
 
             InstallerItem.InstallerItemGroup group = new InstallerItem.InstallerItemGroup(gameVersion, InstallerItem.Style.LIST_ITEM);
 
-            // Conventional libraries: game, fabric, legacyfabric, forge, cleanroom, neoforge, liteloader, optifine
+            // Conventional libraries: game, fabric, forge, cleanroom, neoforge, liteloader, optifine
             for (InstallerItem item : group.getLibraries()) {
                 String libraryId = item.getLibraryId();
 
-                // Skip fabric-api and quilt-api and legacyfabric-api
-                if (libraryId.endsWith("-api")) {
+                // Skip fabric-api, quilt-api
+                if (libraryId.contains("fabric-api") || libraryId.contains("quilt-api")) {
                     continue;
                 }
 
@@ -131,18 +131,20 @@ public class InstallerListPage extends ListPageBase<InstallerItem> implements Ve
 
                 itemsProperty().add(installerItem);
             }
+
+
         }, Platform::runLater);
     }
 
     public void installOffline() {
         FileChooser chooser = new FileChooser();
-        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(i18n("extension.modloader.installer"), "*.jar", "*.exe"));
-        Path file = FileUtils.toPath(chooser.showOpenDialog(Controllers.getStage()));
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(i18n("install.installer.install_offline.extension"), "*.jar", "*.exe"));
+        File file = chooser.showOpenDialog(Controllers.getStage());
         if (file != null) doInstallOffline(file);
     }
 
-    private void doInstallOffline(Path file) {
-        Task<?> task = profile.getDependency().installLibraryAsync(version, file)
+    private void doInstallOffline(File file) {
+        Task<?> task = profile.getDependency().installLibraryAsync(version, file.toPath())
                 .thenComposeAsync(profile.getRepository()::saveAsync)
                 .thenComposeAsync(profile.getRepository().refreshVersionsAsync());
         task.setName(i18n("install.installer.install_offline"));
@@ -165,7 +167,7 @@ public class InstallerListPage extends ListPageBase<InstallerItem> implements Ve
         executor.start();
     }
 
-    private class InstallerListPageSkin extends ToolbarListPageSkin<InstallerItem, InstallerListPage> {
+    private class InstallerListPageSkin extends ToolbarListPageSkin<InstallerListPage> {
 
         InstallerListPageSkin() {
             super(InstallerListPage.this);

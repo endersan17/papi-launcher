@@ -26,10 +26,9 @@ import org.jackhuang.hmcl.task.Task;
 import org.jackhuang.hmcl.util.gson.JsonUtils;
 import org.jackhuang.hmcl.util.io.Zipper;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.StringWriter;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -45,13 +44,13 @@ public class MultiMCModpackExportTask extends Task<Void> {
     private final String versionId;
     private final List<String> whitelist;
     private final MultiMCInstanceConfiguration configuration;
-    private final Path output;
+    private final File output;
 
     /**
      * @param output    mod pack file.
      * @param versionId to locate version.json
      */
-    public MultiMCModpackExportTask(DefaultGameRepository repository, String versionId, List<String> whitelist, MultiMCInstanceConfiguration configuration, Path output) {
+    public MultiMCModpackExportTask(DefaultGameRepository repository, String versionId, List<String> whitelist, MultiMCInstanceConfiguration configuration, File output) {
         this.repository = repository;
         this.versionId = versionId;
         this.whitelist = whitelist;
@@ -59,13 +58,7 @@ public class MultiMCModpackExportTask extends Task<Void> {
         this.output = output;
 
         onDone().register(event -> {
-            if (event.isFailed()) {
-                try {
-                    Files.deleteIfExists(output);
-                } catch (IOException e) {
-                    LOG.warning("Failed to delete modpack file: " + output, e);
-                }
-            }
+            if (event.isFailed()) output.delete();
         });
     }
 
@@ -75,8 +68,8 @@ public class MultiMCModpackExportTask extends Task<Void> {
         blackList.add(versionId + ".jar");
         blackList.add(versionId + ".json");
         LOG.info("Compressing game files without some files in blacklist, including files or directories: usernamecache.json, asm, logs, backups, versions, assets, usercache.json, libraries, crash-reports, launcher_profiles.json, NVIDIA, TCNodeTracker");
-        try (Zipper zip = new Zipper(output)) {
-            zip.putDirectory(repository.getRunDirectory(versionId), ".minecraft", path -> Modpack.acceptFile(path, blackList, whitelist));
+        try (Zipper zip = new Zipper(output.toPath())) {
+            zip.putDirectory(repository.getRunDirectory(versionId).toPath(), ".minecraft", path -> Modpack.acceptFile(path, blackList, whitelist));
 
             String gameVersion = repository.getGameVersion(versionId)
                     .orElseThrow(() -> new IOException("Cannot parse the version of " + versionId));
@@ -103,7 +96,5 @@ public class MultiMCModpackExportTask extends Task<Void> {
         }
     }
 
-    public static final ModpackExportInfo.Options OPTION = new ModpackExportInfo.Options()
-            .requireAuthor()
-            .requireMinMemory();
+    public static final ModpackExportInfo.Options OPTION = new ModpackExportInfo.Options().requireMinMemory();
 }

@@ -20,8 +20,7 @@ package org.jackhuang.hmcl.util.platform;
 import org.jackhuang.hmcl.util.io.IOUtils;
 import org.jackhuang.hmcl.util.versioning.VersionNumber;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.io.File;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 
@@ -84,10 +83,6 @@ public enum Architecture {
 
     public boolean isX86() {
         return this == X86 || this == X86_64;
-    }
-
-    public boolean isArm() {
-        return this == ARM32 || this == ARM64;
     }
 
     public static final Architecture CURRENT_ARCH;
@@ -223,7 +218,7 @@ public enum Architecture {
                     "/bin/uname",
                     "/usr/bin/uname"
             }) {
-                if (Files.exists(Path.of(uname))) {
+                if (new File(uname).exists()) {
                     try {
                         Process process = Runtime.getRuntime().exec(new String[]{uname, "-m"});
                         if (process.waitFor(3, TimeUnit.SECONDS) && process.exitValue() == 0) {

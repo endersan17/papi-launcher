@@ -17,66 +17,84 @@
  */
 package org.jackhuang.hmcl.ui.versions;
 
-import javafx.beans.binding.Bindings;
 import javafx.beans.property.BooleanProperty;
-import javafx.beans.property.ReadOnlyBooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
+import javafx.scene.control.Control;
+import javafx.scene.control.Skin;
+import javafx.scene.control.ToggleGroup;
 import org.jackhuang.hmcl.setting.Profile;
-import org.jackhuang.hmcl.setting.Profiles;
 
-import java.util.Objects;
-
-public class GameListItem extends GameItem {
+public class GameListItem extends Control {
+    private final Profile profile;
+    private final String version;
     private final boolean isModpack;
-    private final BooleanProperty selected = new SimpleBooleanProperty(this, "selected");
+    private final ToggleGroup toggleGroup;
+    private final BooleanProperty selected = new SimpleBooleanProperty();
 
-    public GameListItem(Profile profile, String id) {
-        super(profile, id);
+    public GameListItem(ToggleGroup toggleGroup, Profile profile, String id) {
+        this.profile = profile;
+        this.version = id;
+        this.toggleGroup = toggleGroup;
         this.isModpack = profile.getRepository().isModpack(id);
-        selected.bind(Bindings.createBooleanBinding(
-                () -> profile == Profiles.getSelectedProfile() && Objects.equals(Profiles.getSelectedInstance(profile), id),
-                Profiles.selectedProfileProperty(),
-                Profiles.selectedInstanceProperty()));
+
+        selected.set(id.equals(profile.getSelectedVersion()));
     }
 
-    public ReadOnlyBooleanProperty selectedProperty() {
+    @Override
+    protected Skin<?> createDefaultSkin() {
+        return new GameListItemSkin(this);
+    }
+
+    public ToggleGroup getToggleGroup() {
+        return toggleGroup;
+    }
+
+    public Profile getProfile() {
+        return profile;
+    }
+
+    public String getVersion() {
+        return version;
+    }
+
+    public BooleanProperty selectedProperty() {
         return selected;
     }
 
+    public void checkSelection() {
+        selected.set(version.equals(profile.getSelectedVersion()));
+    }
+
     public void rename() {
-        Versions.renameVersion(profile, id);
+        Versions.renameVersion(profile, version);
     }
 
     public void duplicate() {
-        Versions.duplicateVersion(profile, id);
+        Versions.duplicateVersion(profile, version);
     }
 
     public void remove() {
-        Versions.deleteVersion(profile, id);
+        Versions.deleteVersion(profile, version);
     }
 
     public void export() {
-        Versions.exportVersion(profile, id);
+        Versions.exportVersion(profile, version);
     }
 
     public void browse() {
-        Versions.openFolder(profile, id);
-    }
-
-    public void testGame() {
-        Versions.testGame(profile, id);
+        Versions.openFolder(profile, version);
     }
 
     public void launch() {
-        Versions.launch(profile, id);
+        Versions.testGame(profile, version);
     }
 
     public void modifyGameSettings() {
-        Versions.modifyGameSettings(profile, id);
+        Versions.modifyGameSettings(profile, version);
     }
 
     public void generateLaunchScript() {
-        Versions.generateLaunchScript(profile, id);
+        Versions.generateLaunchScript(profile, version);
     }
 
     public boolean canUpdate() {
@@ -84,6 +102,6 @@ public class GameListItem extends GameItem {
     }
 
     public void update() {
-        Versions.updateVersion(profile, id);
+        Versions.updateVersion(profile, version);
     }
 }

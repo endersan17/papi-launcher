@@ -17,15 +17,16 @@
  */
 package org.jackhuang.hmcl.game;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.io.File;
 import java.time.Instant;
 import java.util.Arrays;
 
-/// The Minecraft version for 1.5.x and earlier.
-///
-/// @author huangyuhui
-public final class ClassicVersion extends Version {
+/**
+ * The Minecraft version for 1.5.x and earlier.
+ *
+ * @author huangyuhui
+ */
+public class ClassicVersion extends Version {
 
     public ClassicVersion() {
         super(true, "Classic", null, null, "${auth_player_name} ${auth_session} --workDir ${game_directory}",
@@ -34,7 +35,8 @@ public final class ClassicVersion extends Version {
                 null, null, null, ReleaseType.UNKNOWN, Instant.now(), Instant.now(), 0, false, false, null);
     }
 
-    private static final class ClassicLibrary extends Library {
+    private static class ClassicLibrary extends Library {
+
         public ClassicLibrary(String name) {
             super(new Artifact("", "", ""), null,
                     new LibrariesDownloadInfo(new LibraryDownloadInfo("bin/" + name + ".jar"), null),
@@ -42,11 +44,11 @@ public final class ClassicVersion extends Version {
         }
     }
 
-    public static boolean hasClassicVersion(Path baseDirectory) {
-        Path bin = baseDirectory.resolve("bin");
-        return Files.isDirectory(bin)
-                && Files.exists(bin.resolve("lwjgl.jar"))
-                && Files.exists(bin.resolve("jinput.jar"))
-                && Files.exists(bin.resolve("lwjgl_util.jar"));
+    public static boolean hasClassicVersion(File baseDirectory) {
+        File bin = new File(baseDirectory, "bin");
+        return bin.exists()
+                && new File(bin, "lwjgl.jar").exists()
+                && new File(bin, "jinput.jar").exists()
+                && new File(bin, "lwjgl_util.jar").exists();
     }
 }

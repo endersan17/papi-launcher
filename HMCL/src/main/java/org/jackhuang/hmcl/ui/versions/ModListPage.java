@@ -17,6 +17,7 @@
  */
 package org.jackhuang.hmcl.ui.versions;
 
+import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.collections.ObservableList;
@@ -26,9 +27,7 @@ import org.jackhuang.hmcl.download.LibraryAnalyzer;
 import org.jackhuang.hmcl.game.HMCLGameRepository;
 import org.jackhuang.hmcl.game.Version;
 import org.jackhuang.hmcl.mod.LocalModFile;
-import org.jackhuang.hmcl.mod.ModLoaderType;
 import org.jackhuang.hmcl.mod.ModManager;
-import org.jackhuang.hmcl.setting.DownloadProviders;
 import org.jackhuang.hmcl.setting.Profile;
 import org.jackhuang.hmcl.task.Schedulers;
 import org.jackhuang.hmcl.task.Task;
@@ -40,34 +39,30 @@ import org.jackhuang.hmcl.ui.construct.PageAware;
 import org.jackhuang.hmcl.util.TaskCancellationAction;
 import org.jackhuang.hmcl.util.io.FileUtils;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.nio.file.Path;
 import java.util.*;
-import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
 
-import static org.jackhuang.hmcl.util.i18n.I18n.i18n;
+import static org.jackhuang.hmcl.ui.FXUtils.runInFX;
 import static org.jackhuang.hmcl.util.logging.Logger.LOG;
+import static org.jackhuang.hmcl.util.i18n.I18n.i18n;
 
 public final class ModListPage extends ListPageBase<ModListPageSkin.ModInfoObject> implements VersionPage.VersionLoadable, PageAware {
     private final BooleanProperty modded = new SimpleBooleanProperty(this, "modded", false);
 
-    private final ReentrantLock lock = new ReentrantLock();
-
     private ModManager modManager;
+    private LibraryAnalyzer libraryAnalyzer;
     private Profile profile;
-    private String instanceId;
-    private String gameVersion;
-
-    final EnumSet<ModLoaderType> supportedLoaders = EnumSet.noneOf(ModLoaderType.class);
+    private String versionId;
 
     public ModListPage() {
-        FXUtils.applyDragListener(this, it -> ModManager.MOD_EXTENSIONS.contains(FileUtils.getExtension(it).toLowerCase(Locale.ROOT)), mods -> {
+        FXUtils.applyDragListener(this, it -> Arrays.asList("jar", "zip", "litemod").contains(FileUtils.getExtension(it)), mods -> {
             mods.forEach(it -> {
                 try {
-                    modManager.addMod(it);
+                    modManager.addMod(it.toPath());
                 } catch (IOException | IllegalArgumentException e) {
                     LOG.warning("Unable to parse mod file " + it, e);
                 }
@@ -88,93 +83,44 @@ public final class ModListPage extends ListPageBase<ModListPageSkin.ModInfoObjec
     @Override
     public void loadVersion(Profile profile, String id) {
         this.profile = profile;
-        this.instanceId = id;
+        this.versionId = id;
 
         HMCLGameRepository repository = profile.getRepository();
         Version resolved = repository.getResolvedPreservingPatchesVersion(id);
-        this.gameVersion = repository.getGameVersion(resolved).orElse(null);
-        LibraryAnalyzer analyzer = LibraryAnalyzer.analyze(resolved, gameVersion);
-        modded.set(analyzer.hasModLoader());
+        libraryAnalyzer = LibraryAnalyzer.analyze(resolved, repository.getGameVersion(resolved).orElse(null));
+        modded.set(libraryAnalyzer.hasModLoader());
         loadMods(profile.getRepository().getModManager(id));
     }
 
-    private void loadMods(ModManager modManager) {
-        setLoading(true);
-
+    private CompletableFuture<?> loadMods(ModManager modManager) {
         this.modManager = modManager;
-        CompletableFuture.supplyAsync(() -> {
-            lock.lock();
+        return CompletableFuture.supplyAsync(() -> {
             try {
-                modManager.refresh();
-                return modManager.getLocalFiles().stream().map(ModListPageSkin.ModInfoObject::new).toList();
+                synchronized (ModListPage.this) {
+                    runInFX(() -> loadingProperty().set(true));
+                    modManager.refreshMods();
+                    return new ArrayList<>(modManager.getMods());
+                }
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
-            } finally {
-                lock.unlock();
             }
-        }, Schedulers.io()).whenCompleteAsync((list, exception) -> {
-            updateSupportedLoaders(modManager);
+        }, Schedulers.defaultScheduler()).whenCompleteAsync((list, exception) -> {
+            loadingProperty().set(false);
+            if (exception == null)
+                itemsProperty().setAll(list.stream().map(ModListPageSkin.ModInfoObject::new).sorted().collect(Collectors.toList()));
+            else
+                getProperties().remove(ModListPage.class);
 
-            if (exception == null) {
-                getItems().setAll(list);
-            } else {
-                LOG.warning("Failed to load mods", exception);
-                getItems().clear();
-            }
-            setLoading(false);
-        }, Schedulers.javafx());
-    }
-
-    private void updateSupportedLoaders(ModManager modManager) {
-        supportedLoaders.clear();
-
-        LibraryAnalyzer analyzer = modManager.getLibraryAnalyzer();
-        if (analyzer == null) {
-            Collections.addAll(supportedLoaders, ModLoaderType.values());
-            return;
-        }
-
-        for (LibraryAnalyzer.LibraryType type : LibraryAnalyzer.LibraryType.values()) {
-            if (type.isModLoader() && analyzer.has(type)) {
-                ModLoaderType modLoaderType = type.getModLoaderType();
-                if (modLoaderType != null) {
-                    supportedLoaders.add(modLoaderType);
-
-                    if (modLoaderType == ModLoaderType.CLEANROOM)
-                        supportedLoaders.add(ModLoaderType.FORGE);
-                }
-            }
-        }
-
-        if (analyzer.has(LibraryAnalyzer.LibraryType.NEO_FORGE) && "1.20.1".equals(gameVersion)) {
-            supportedLoaders.add(ModLoaderType.FORGE);
-        }
-
-        if (analyzer.has(LibraryAnalyzer.LibraryType.QUILT)) {
-            supportedLoaders.add(ModLoaderType.FABRIC);
-        }
-
-        if (analyzer.has(LibraryAnalyzer.LibraryType.LEGACY_FABRIC)) {
-            supportedLoaders.add(ModLoaderType.FABRIC);
-        }
-
-        if (analyzer.has(LibraryAnalyzer.LibraryType.FABRIC) && modManager.hasMod("kilt", ModLoaderType.FABRIC)) {
-            supportedLoaders.add(ModLoaderType.FORGE);
-            supportedLoaders.add(ModLoaderType.NEO_FORGE);
-        }
-
-        // Sinytra Connector
-        if (analyzer.has(LibraryAnalyzer.LibraryType.NEO_FORGE) && modManager.hasMod("connectormod", ModLoaderType.NEO_FORGE)
-                || "1.20.1".equals(gameVersion) && analyzer.has(LibraryAnalyzer.LibraryType.FORGE) && modManager.hasMod("connectormod", ModLoaderType.FORGE)) {
-            supportedLoaders.add(ModLoaderType.FABRIC);
-        }
+            // https://github.com/HMCL-dev/HMCL/issues/938
+            System.gc();
+        }, Platform::runLater);
     }
 
     public void add() {
         FileChooser chooser = new FileChooser();
-        chooser.setTitle(i18n("mods.add.title"));
-        chooser.getExtensionFilters().setAll(new FileChooser.ExtensionFilter(i18n("extension.mod"), "*.jar", "*.litemod"));
-        List<Path> res = FileUtils.toPaths(chooser.showOpenMultipleDialog(Controllers.getStage()));
+        chooser.setTitle(i18n("mods.choose_mod"));
+        chooser.getExtensionFilters().setAll(new FileChooser.ExtensionFilter(i18n("extension.mod"), "*.jar", "*.zip", "*.litemod"));
+        List<File> res = chooser.showOpenMultipleDialog(Controllers.getStage());
 
         if (res == null) return;
 
@@ -183,13 +129,13 @@ public final class ModListPage extends ListPageBase<ModListPageSkin.ModInfoObjec
         List<String> failed = new ArrayList<>();
 
         Task.runAsync(() -> {
-            for (Path file : res) {
+            for (File file : res) {
                 try {
-                    modManager.addMod(file);
-                    succeeded.add(FileUtils.getName(file));
+                    modManager.addMod(file.toPath());
+                    succeeded.add(file.getName());
                 } catch (Exception e) {
                     LOG.warning("Unable to add mod " + file, e);
-                    failed.add(FileUtils.getName(file));
+                    failed.add(file.getName());
 
                     // Actually addMod will not throw exceptions because FileChooser has already filtered files.
                 }
@@ -205,7 +151,7 @@ public final class ModListPage extends ListPageBase<ModListPageSkin.ModInfoObjec
         }).start();
     }
 
-    void removeSelected(ObservableList<ModListPageSkin.ModInfoObject> selectedItems) {
+    public void removeSelected(ObservableList<ModListPageSkin.ModInfoObject> selectedItems) {
         try {
             modManager.removeMods(selectedItems.stream()
                     .filter(Objects::nonNull)
@@ -217,14 +163,14 @@ public final class ModListPage extends ListPageBase<ModListPageSkin.ModInfoObjec
         }
     }
 
-    void enableSelected(ObservableList<ModListPageSkin.ModInfoObject> selectedItems) {
+    public void enableSelected(ObservableList<ModListPageSkin.ModInfoObject> selectedItems) {
         selectedItems.stream()
                 .filter(Objects::nonNull)
                 .map(ModListPageSkin.ModInfoObject::getModInfo)
                 .forEach(info -> info.setActive(true));
     }
 
-    void disableSelected(ObservableList<ModListPageSkin.ModInfoObject> selectedItems) {
+    public void disableSelected(ObservableList<ModListPageSkin.ModInfoObject> selectedItems) {
         selectedItems.stream()
                 .filter(Objects::nonNull)
                 .map(ModListPageSkin.ModInfoObject::getModInfo)
@@ -232,30 +178,31 @@ public final class ModListPage extends ListPageBase<ModListPageSkin.ModInfoObjec
     }
 
     public void openModFolder() {
-        FXUtils.openFolder(profile.getRepository().getRunDirectory(instanceId).resolve("mods"));
+        FXUtils.openFolder(new File(profile.getRepository().getRunDirectory(versionId), "mods"));
     }
 
-    public void checkUpdates(Collection<LocalModFile> mods) {
-        Objects.requireNonNull(mods);
+    public void checkUpdates() {
         Runnable action = () -> Controllers.taskDialog(Task
                         .composeAsync(() -> {
-                            Optional<String> gameVersion = profile.getRepository().getGameVersion(instanceId);
-                            return gameVersion.map(g -> new AddonCheckUpdatesTask<>(DownloadProviders.getDownloadProvider(), g, mods)).orElse(null);
+                            Optional<String> gameVersion = profile.getRepository().getGameVersion(versionId);
+                            if (gameVersion.isPresent()) {
+                                return new ModCheckUpdatesTask(gameVersion.get(), modManager.getMods());
+                            }
+                            return null;
                         })
                         .whenComplete(Schedulers.javafx(), (result, exception) -> {
-                            if (exception instanceof CancellationException) return;
                             if (exception != null || result == null) {
                                 Controllers.dialog(i18n("mods.check_updates.failed_check"), i18n("message.failed"), MessageDialogPane.MessageType.ERROR);
                             } else if (result.isEmpty()) {
                                 Controllers.dialog(i18n("mods.check_updates.empty"));
                             } else {
-                                Controllers.navigateForward(new AddonUpdatesPage<>(modManager, result));
+                                Controllers.navigate(new ModUpdatesPage(modManager, result));
                             }
                         })
-                        .withStagesHints("update.checking"),
-                i18n("mods.check_updates"), TaskCancellationAction.NORMAL);
+                        .withStagesHint(Collections.singletonList("mods.check_updates")),
+                i18n("update.checking"), TaskCancellationAction.NORMAL);
 
-        if (profile.getRepository().isModpack(instanceId)) {
+        if (profile.getRepository().isModpack(versionId)) {
             Controllers.confirm(
                     i18n("mods.update_modpack_mod.warning"), null,
                     MessageDialogPane.MessageType.WARNING,
@@ -266,7 +213,7 @@ public final class ModListPage extends ListPageBase<ModListPageSkin.ModInfoObjec
     }
 
     public void download() {
-        Controllers.getDownloadPage().showModDownloads().selectVersion(instanceId);
+        Controllers.getDownloadPage().showModDownloads().selectVersion(versionId);
         Controllers.navigate(Controllers.getDownloadPage());
     }
 
@@ -295,7 +242,7 @@ public final class ModListPage extends ListPageBase<ModListPageSkin.ModInfoObjec
         return this.profile;
     }
 
-    public String getInstanceId() {
-        return this.instanceId;
+    public String getVersionId() {
+        return this.versionId;
     }
 }

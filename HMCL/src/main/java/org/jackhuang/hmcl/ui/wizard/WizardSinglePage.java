@@ -18,7 +18,8 @@
 package org.jackhuang.hmcl.ui.wizard;
 
 import javafx.scene.control.Control;
-import org.jackhuang.hmcl.util.SettingsMap;
+
+import java.util.Map;
 
 public abstract class WizardSinglePage extends Control implements WizardPage {
     protected final Runnable onFinish;
@@ -30,6 +31,6 @@ public abstract class WizardSinglePage extends Control implements WizardPage {
     protected abstract Object finish();
 
     @Override
-    public void cleanup(SettingsMap settings) {
+    public void cleanup(Map<String, Object> settings) {
     }
 }

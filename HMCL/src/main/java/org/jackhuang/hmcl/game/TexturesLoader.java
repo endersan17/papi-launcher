@@ -26,6 +26,8 @@ import javafx.beans.value.ObservableValue;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.Image;
+import javafx.scene.image.PixelReader;
+import javafx.scene.image.PixelWriter;
 import org.jackhuang.hmcl.Metadata;
 import org.jackhuang.hmcl.auth.Account;
 import org.jackhuang.hmcl.auth.ServerResponseMalformedException;
@@ -84,7 +86,7 @@ public final class TexturesLoader {
     }
 
     private static final ThreadPoolExecutor POOL = threadPool("TexturesDownload", true, 2, 10, TimeUnit.SECONDS);
-    private static final Path TEXTURES_DIR = Metadata.HMCL_USER_HOME.resolve("skins");
+    private static final Path TEXTURES_DIR = Metadata.HMCL_GLOBAL_DIRECTORY.resolve("skins");
 
     private static Path getTexturePath(Texture texture) {
         String url = texture.getUrl();
@@ -195,18 +197,18 @@ public final class TexturesLoader {
     }
 
     public static ObservableValue<LoadedTexture> skinBinding(Account account) {
-        LoadedTexture uuidFallback = getDefaultSkin(account.getProfileID());
+        LoadedTexture uuidFallback = getDefaultSkin(account.getUUID());
         if (account instanceof OfflineAccount) {
             OfflineAccount offlineAccount = (OfflineAccount) account;
 
             SimpleObjectProperty<LoadedTexture> binding = new SimpleObjectProperty<>();
             InvalidationListener listener = o -> {
                 Skin skin = offlineAccount.getSkin();
-                String profileName = offlineAccount.getProfileName();
+                String username = offlineAccount.getUsername();
 
                 binding.set(uuidFallback);
                 if (skin != null) {
-                    skin.load(profileName).setExecutor(POOL).whenComplete(Schedulers.javafx(), (result, exception) -> {
+                    skin.load(username).setExecutor(POOL).whenComplete(Schedulers.javafx(), (result, exception) -> {
                         if (exception != null) {
                             LOG.warning("Failed to load texture", exception);
                         } else if (result != null && result.getSkin() != null && result.getSkin().getImage() != null) {
@@ -262,8 +264,15 @@ public final class TexturesLoader {
         int scale = (int) skin.getWidth() / 64;
         int faceOffset = (int) Math.round(size / 18.0);
 
-        g.setImageSmoothing(false);
-        drawAvatar(g, skin, size, scale, faceOffset);
+        try {
+            g.setImageSmoothing(false);
+            drawAvatar(g, skin, size, scale, faceOffset);
+        } catch (NoSuchMethodError ignored) {
+            // Earlier JavaFX did not support GraphicsContext::setImageSmoothing
+            // In order to prevent the blurring caused by bilinear interpolation,
+            // we use the self-implemented nearest neighbor interpolation to scale
+            drawAvatarSlow(g, skin, size, scale, faceOffset);
+        }
     }
 
     private static void drawAvatar(GraphicsContext g, Image skin, int size, int scale, int faceOffset) {
@@ -273,6 +282,37 @@ public final class TexturesLoader {
         g.drawImage(skin,
                 40 * scale, 8 * scale, 8 * scale, 8 * scale,
                 0, 0, size, size);
+    }
+
+    private static void drawAvatarSlow(GraphicsContext g, Image skin, int size, int scale, int faceOffset) {
+        PixelReader reader = skin.getPixelReader();
+        PixelWriter writer = g.getPixelWriter();
+        drawImage(writer, reader,
+                8 * scale, 8 * scale, 8 * scale, 8 * scale,
+                faceOffset, faceOffset, size - 2 * faceOffset, size - 2 * faceOffset);
+        drawImage(writer, reader,
+                40 * scale, 8 * scale, 8 * scale, 8 * scale,
+                0, 0, size, size);
+    }
+
+    /*
+     * Scale and draw image using nearest-neighbor interpolation
+     */
+    private static void drawImage(PixelWriter writer, PixelReader reader,
+                                  int sx, int sy, int sw, int sh,
+                                  int dx, int dy, int dw, int dh) {
+        double xScale = ((double) sw) / dw;
+        double yScale = ((double) sh) / dh;
+
+        for (int xOffset = 0; xOffset < dw; xOffset++) {
+            for (int yOffset = 0; yOffset < dh; yOffset++) {
+                int color = reader.getArgb(sx + (int) (xOffset * xScale), sy + (int) (yOffset * yScale));
+
+                // Draw only non-transparent pixels
+                if ((color >>> 24) != 0)
+                    writer.setArgb(dx + xOffset, dy + yOffset, color);
+            }
+        }
     }
 
     private static final class SkinBindingChangeListener implements ChangeListener<LoadedTexture> {
@@ -318,7 +358,7 @@ public final class TexturesLoader {
             fxAvatarBinding(canvas, skinBinding(account));
         else {
             unbindAvatar(canvas);
-            drawAvatar(canvas, getDefaultSkin(account.getProfileID()).image);
+            drawAvatar(canvas, getDefaultSkin(account.getUUID()).image);
         }
     }
 

@@ -32,6 +32,7 @@ import org.jackhuang.hmcl.util.io.NetworkUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -54,7 +55,7 @@ public class McbbsModpackCompletionTask extends CompletableFutureTask<Void> {
     private final DefaultGameRepository repository;
     private final ModManager modManager;
     private final String version;
-    private final Path configurationFile;
+    private final File configurationFile;
     private ModpackConfiguration<McbbsModpackManifest> configuration;
     private McbbsModpackManifest manifest;
     private final List<Task<?>> dependencies = new ArrayList<>();
@@ -84,7 +85,7 @@ public class McbbsModpackCompletionTask extends CompletableFutureTask<Void> {
             if (configuration == null) {
                 // Load configuration from disk
                 try {
-                    configuration = JsonUtils.fromNonNullJson(Files.readString(configurationFile), ModpackConfiguration.typeOf(McbbsModpackManifest.class));
+                    configuration = JsonUtils.fromNonNullJson(Files.readString(configurationFile.toPath()), ModpackConfiguration.typeOf(McbbsModpackManifest.class));
                 } catch (IOException | JsonParseException e) {
                     throw new IOException("Malformed modpack configuration");
                 }
@@ -109,7 +110,7 @@ public class McbbsModpackCompletionTask extends CompletableFutureTask<Void> {
                     throw new IOException("Unable to parse server manifest.json from " + manifest.getFileApi(), e);
                 }
 
-                Path rootPath = repository.getVersionRoot(version);
+                Path rootPath = repository.getVersionRoot(version).toPath();
                 Files.createDirectories(rootPath);
 
                 Map<McbbsModpackManifest.File, McbbsModpackManifest.File> localFiles = manifest.getFiles().stream().collect(Collectors.toMap(Function.identity(), Function.identity()));
@@ -171,7 +172,7 @@ public class McbbsModpackCompletionTask extends CompletableFutureTask<Void> {
                 manifest = remoteManifest.setFiles(newFiles);
                 return executor.all(tasks.stream().filter(Objects::nonNull).collect(Collectors.toList()));
             })).thenAcceptAsync(wrapConsumer(unused1 -> {
-                Path manifestFile = repository.getModpackConfiguration(version);
+                Path manifestFile = repository.getModpackConfiguration(version).toPath();
                 JsonUtils.writeToJsonFile(manifestFile,
                         new ModpackConfiguration<>(manifest, this.configuration.getType(), this.manifest.getName(), this.manifest.getVersion(),
                                 this.manifest.getFiles().stream()
@@ -238,7 +239,7 @@ public class McbbsModpackCompletionTask extends CompletableFutureTask<Void> {
 
                         manifest = newManifest;
                         configuration = configuration.setManifest(newManifest);
-                        JsonUtils.writeToJsonFile(configurationFile, configuration);
+                        JsonUtils.writeToJsonFile(configurationFile.toPath(), configuration);
 
                         for (McbbsModpackManifest.File file : newManifest.getFiles())
                             if (file instanceof McbbsModpackManifest.CurseFile) {
@@ -273,7 +274,7 @@ public class McbbsModpackCompletionTask extends CompletableFutureTask<Void> {
     @Nullable
     private Path getFilePath(McbbsModpackManifest.File file) {
         if (file instanceof McbbsModpackManifest.AddonFile) {
-            return modManager.getRepository().getRunDirectory(modManager.getInstanceId()).resolve(((McbbsModpackManifest.AddonFile) file).getPath());
+            return modManager.getRepository().getRunDirectory(modManager.getVersion()).toPath().resolve(((McbbsModpackManifest.AddonFile) file).getPath());
         } else if (file instanceof McbbsModpackManifest.CurseFile) {
             String fileName = ((McbbsModpackManifest.CurseFile) file).getFileName();
             if (fileName == null) return null;

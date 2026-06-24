@@ -53,7 +53,7 @@ public final class GameVersionList extends VersionList<GameRemoteVersion> {
 
     @Override
     public Task<?> refreshAsync() {
-        return new GetTask(downloadProvider.getVersionListURLs()).thenGetJsonAsync(GameRemoteVersions.class)
+        return new GetTask(downloadProvider.getVersionListURL()).thenGetJsonAsync(GameRemoteVersions.class)
                 .thenAcceptAsync(root -> {
                     GameRemoteVersions unlistedVersions = null;
 
@@ -70,21 +70,21 @@ public final class GameVersionList extends VersionList<GameRemoteVersion> {
                         versions.clear();
 
                         if (unlistedVersions != null) {
-                            for (GameRemoteVersionInfo unlistedVersion : unlistedVersions.versions()) {
-                                versions.put(unlistedVersion.gameVersion(), new GameRemoteVersion(
-                                        unlistedVersion.gameVersion(),
-                                        unlistedVersion.gameVersion(),
-                                        Collections.singletonList(unlistedVersion.url()),
-                                        unlistedVersion.type(), unlistedVersion.releaseTime()));
+                            for (GameRemoteVersionInfo unlistedVersion : unlistedVersions.getVersions()) {
+                                versions.put(unlistedVersion.getGameVersion(), new GameRemoteVersion(
+                                        unlistedVersion.getGameVersion(),
+                                        unlistedVersion.getGameVersion(),
+                                        Collections.singletonList(unlistedVersion.getUrl()),
+                                        unlistedVersion.getType(), unlistedVersion.getReleaseTime()));
                             }
                         }
 
-                        for (GameRemoteVersionInfo remoteVersion : root.versions()) {
-                            versions.put(remoteVersion.gameVersion(), new GameRemoteVersion(
-                                    remoteVersion.gameVersion(),
-                                    remoteVersion.gameVersion(),
-                                    Collections.singletonList(remoteVersion.url()),
-                                    remoteVersion.type(), remoteVersion.releaseTime()));
+                        for (GameRemoteVersionInfo remoteVersion : root.getVersions()) {
+                            versions.put(remoteVersion.getGameVersion(), new GameRemoteVersion(
+                                    remoteVersion.getGameVersion(),
+                                    remoteVersion.getGameVersion(),
+                                    Collections.singletonList(remoteVersion.getUrl()),
+                                    remoteVersion.getType(), remoteVersion.getReleaseTime()));
                         }
                     } finally {
                         lock.writeLock().unlock();
@@ -92,8 +92,4 @@ public final class GameVersionList extends VersionList<GameRemoteVersion> {
                 });
     }
 
-    @Override
-    public String toString() {
-        return "GameVersionList[downloadProvider=%s]".formatted(downloadProvider);
-    }
 }

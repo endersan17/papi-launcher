@@ -1,52 +1,110 @@
 /**
- * Hello Minecraft! Launcher
- * Copyright (C) 2020  huangyuhui <huanghongxun2008@126.com> and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ * PAPI LAUNCHER - ROOT CSS
+ * Uses -papi-* looked-up colors defined by active papitheme
+ * Fallback values defined here; theme CSS (loaded later) overrides them.
  */
 
 .root {
+    -papi-primary: #00FF9D;
+    -papi-primary-darker: #00CC7D;
+    -papi-primary-lighter: #4DFFB5;
+    -papi-bg: #0A0A0A;
+    -papi-surface: rgba(15,15,18,0.72);
+    -papi-overlay: rgba(10,10,15,0.92);
+    -papi-dialog-bg: rgba(10,10,10,0.80);
+    -papi-surface-alt: rgba(10,10,10,0.65);
+    -papi-border: rgba(255,255,255,0.12);
+    -papi-border-subtle: rgba(255,255,255,0.06);
+    -papi-shadow: rgba(0,0,0,0.6);
+    -papi-text: #FFFFFF;
+    -papi-text-secondary: rgba(255,255,255,0.7);
+    -papi-text-tertiary: rgba(255,255,255,0.5);
+    -papi-error: #FF5555;
+    -papi-success: #00B064;
+    -papi-warning: #CC9000;
+    -papi-info: #0080D0;
+    -papi-opacity-bg: 0.82;
+    -papi-opacity-surface: 0.72;
+    -papi-opacity-overlay: 0.92;
+    -papi-primary-alpha-010: rgba(0, 255, 157, 0.10);
+    -papi-primary-alpha-015: rgba(0, 255, 157, 0.15);
+    -papi-primary-alpha-020: rgba(0, 255, 157, 0.20);
+    -papi-primary-alpha-025: rgba(0, 255, 157, 0.25);
+    -papi-primary-alpha-030: rgba(0, 255, 157, 0.30);
+    -papi-primary-alpha-035: rgba(0, 255, 157, 0.35);
+    -papi-primary-alpha-040: rgba(0, 255, 157, 0.40);
+    -papi-primary-alpha-050: rgba(0, 255, 157, 0.50);
+    -fx-font-smoothing-type: lcd;
+    -fx-text-fill: #FFFFFF;
 }
 
-.svg {
-    -fx-fill: -monet-on-surface;
+/* ═══ ALL ICONS — ALWAYS WHITE, NO EXCEPTIONS ═══ */
+SVGPath {
+    -fx-fill: -papi-text;
 }
 
-.label {
-    -fx-text-fill: -monet-on-surface;
+.jfx-text-field, .text-input, TextField, TextArea {
+    -fx-text-fill: -papi-text;
+    -fx-prompt-text-fill: -papi-text-tertiary;
 }
 
+Text, Label, .label, Title, Subtitle, .title, .subtitle, .header, Header {
+    -fx-text-fill: -papi-text !important;
+}
+
+.advanced-list-item .title,
+.navigation-drawer-item .title,
+.two-line-list-item .title,
+.first-line .title,
+.two-line-list-item > .first-line > .title,
+.profile-list-item .title {
+    -fx-text-fill: -papi-text !important;
+}
+
+.root {
+    -fx-background: -papi-bg;
+    -fx-text-fill: #FFFFFF;
+}
+
+.root, .root Text, .root Label, .root * {
+    -fx-text-fill: -papi-text !important;
+}
+
+.root, .root Text, .root Label, .root * {
+    -fx-text-fill: -papi-text !important;
+}
+* {
+    -fx-text-fill: -papi-text;
+}
+Label, Text {
+    -fx-text-fill: -papi-text;
+}
+
+.root Label, .root Text {
+    -fx-text-fill: -papi-text;
+}
+
+/* === SCROLLBAR OSCURO === */
 .scroll-bar .thumb {
-    -fx-fill: -monet-surface-tint;
-    -fx-arc-width: 6;
-    -fx-arc-height: 6;
+    -fx-fill: -papi-primary-alpha-050;
+    -fx-arc-width: 0;
+    -fx-arc-height: 0;
+}
+
+.disabled Label {
+    -fx-text-fill: rgba(255, 255, 255, 0.4);
 }
 
 .title-label {
-    -fx-text-fill: -monet-on-surface;
+    -fx-font-size: 16.0px;
+    -fx-padding: 14.0px;
+    -fx-text-fill: #FFFFFF;
+    -fx-font-weight: 600;
 }
 
 .subtitle-label {
-    -fx-text-fill: -monet-on-surface-variant;
-}
-
-.hyperlink {
-    -fx-text-fill: -monet-primary;
-}
-
-.hyperlink:focused {
-    -fx-border-color: -monet-primary;
+    -fx-text-fill: rgba(255, 255, 255, 0.6);
+    -fx-font-size: 12px;
 }
 
 .hint {
@@ -56,50 +114,41 @@
     -fx-padding: 6;
 }
 
-.hint .hyperlink {
-    -fx-fill: -monet-primary;
-    -fx-text-fill: -monet-primary;
-}
-
+/* === HINTS === */
 .hint.info {
-    -fx-background-color: -monet-primary-fixed-dim;
-    -fx-border-color: -monet-outline;
+    -fx-background-color: rgba(0, 100, 200, 0.15);
+    -fx-border-color: rgba(0, 100, 200, 0.4);
 }
 
 .hint.info Text, .hint.info .svg {
-    -fx-fill: -monet-on-primary-fixed;
+    -fx-fill: -papi-info;
 }
 
 .hint.success {
-    -fx-background-color: #d1e7dd;
-    -fx-border-color: -monet-outline;
+    -fx-background-color: rgba(0, 180, 100, 0.15);
+    -fx-border-color: rgba(0, 180, 100, 0.4);
 }
 
 .hint.success Text, .hint.success .svg {
-    -fx-fill: #0a3622;
+    -fx-fill: -papi-success;
 }
 
 .hint.error {
-    -fx-background-color: -monet-error-container;
-    -fx-border-color: -monet-outline;
+    -fx-background-color: rgba(200, 40, 50, 0.15);
+    -fx-border-color: rgba(200, 40, 50, 0.4);
 }
 
 .hint.error Text, .hint.error .svg {
-    -fx-fill: -monet-on-error-container;
+    -fx-fill: -papi-error;
 }
 
 .hint.warning {
-    -fx-background-color: -monet-tertiary-fixed-dim;
-    -fx-border-color: -monet-outline;
+    -fx-background-color: rgba(200, 150, 0, 0.15);
+    -fx-border-color: rgba(200, 150, 0, 0.4);
 }
 
 .hint.warning Text, .hint.warning .svg {
-    -fx-fill: -monet-on-tertiary-fixed;
-}
-
-.hint.warning .hyperlink {
-    -fx-fill: -fx-hyperlink-fill;
-    -fx-text-fill: -fx-hyperlink-fill;
+    -fx-fill: -papi-warning;
 }
 
 .skin-pane .jfx-text-field {
@@ -113,36 +162,39 @@
 .memory-label {
 }
 
-.memory-status-bar {
-    -fx-opacity: 1;
+.memory-used {
+    -fx-background-color: -papi-primary-darker;
 }
 
-.memory-status-bar:disabled {
+.memory-used:disabled {
     -fx-opacity: 0.4;
 }
 
-.memory-status-bar .track {
-    -fx-background-color: -monet-secondary-container;
-    -fx-background-radius: 2;
-    -fx-background-insets: 0;
+.memory-allocate {
+    -fx-background-color: -papi-primary;
 }
 
-.memory-status-bar .memory-used {
-    -fx-fill: -monet-primary;
+.memory-allocate:disabled {
+    -fx-opacity: 0.4;
 }
 
-.memory-status-bar .memory-allocate {
-    -fx-fill: -monet-primary-transparent-50;
+.memory-total {
+    -fx-background-color: -papi-primary-alpha-025;
+}
+
+.memory-total:disabled {
+    -fx-opacity: 0.4;
 }
 
 .update-label {
-    -fx-text-fill: -monet-tertiary;
+    -fx-text-fill: -papi-primary;
+    -fx-font-weight: 600;
 }
 
 .radio-button-title-label {
     -fx-font-size: 16px;
     -fx-padding: 14.0 0.0 -20.0 0.0;
-    -fx-text-fill: rgba(0.0, 0.0, 0.0, 0.87);
+    -fx-text-fill: -papi-text;
 }
 
 .announcement {
@@ -150,32 +202,30 @@
 }
 
 .announcement .title {
-    -fx-text-fill: -monet-on-surface;
     -fx-font-size: 14px;
     -fx-font-weight: BOLD;
 }
 
-.announcement Text {
-    -fx-fill: -monet-on-surface;
-    -fx-font-size: 13px;
-}
-
-.announcement .hyperlink {
-    -fx-fill: -monet-primary;
+.announcement JFXHyperlink, .announcement Text {
     -fx-font-size: 13px;
 }
 
 .rippler-container {
-    -jfx-rippler-fill: -monet-on-surface-variant;
+    -jfx-rippler-fill: -papi-primary-alpha-035;
 }
 
-.advanced-list-item .rippler-container {
-    -jfx-rippler-fill: -monet-on-secondary-container;
+.rippler-container:selected .label {
+    -fx-text-fill: #FFFFFF;
 }
 
+/* === ADVANCED LIST ITEMS - GLASS CARD === */
 .advanced-list-item > .rippler-container > .container {
     -fx-padding: 10 16 10 16;
-    -fx-background-color: null;
+    -fx-background-color: -papi-surface;
+    -fx-background-radius: 14px;
+    -fx-border-color: rgba(255, 255, 255, 0.08);
+    -fx-border-width: 1px;
+    -fx-border-radius: 14px;
 }
 
 .advanced-list-item > .rippler-container > .container > .two-line-list-item {
@@ -186,30 +236,40 @@
 .advanced-list-item > .rippler-container > .container > .two-line-list-item > .first-line > .title {
     -fx-font-size: 13;
     -fx-text-alignment: justify;
+    -fx-text-fill: #FFFFFF;
 }
 
 .advanced-list-item > .rippler-container > .container > .two-line-list-item > HBox > .subtitle {
     -fx-font-size: 10;
     -fx-text-alignment: justify;
+    -fx-text-fill: #FFFFFF;
 }
 
 .advanced-list-item:selected > .rippler-container > .container {
-    -fx-background-color: -monet-secondary-container-transparent-50;
+    -fx-background-color: -papi-primary-alpha-015;
+    -fx-border-color: -papi-primary;
+    -fx-border-width: 2px;
 }
 
 .advanced-list-item:selected > .rippler-container > .container > .two-line-list-item > .first-line > .title {
-    -fx-text-fill: -monet-on-secondary-container;
+    -fx-text-fill: -papi-primary-lighter;
     -fx-font-weight: bold;
 }
 
 .advanced-list-item:selected .svg {
-    -fx-fill: -monet-on-secondary-container;
+    -fx-fill: -papi-text;
 }
 
 .navigation-drawer-item > .rippler-container > .container > VBox {
     -fx-padding: 0 0 0 0;
 }
 
+/* ═══ SIDEBAR HOVER — MINIMALISTA, SOLO BORDE ═══ */
+.advanced-list-item:hover > .rippler-container > .container {
+    -fx-border-color: -papi-primary-alpha-040;
+}
+
+/* === PROFILE LIST - GLASS CARD === */
 .profile-list-item > .rippler-container > BorderPane > .two-line-list-item > .first-line > .title {
     -fx-font-size: 13;
 }
@@ -223,20 +283,25 @@
 }
 
 .profile-list-item:selected > .rippler-container > BorderPane {
-    -fx-background-color: -monet-secondary-container-transparent-50;
+    -fx-background-color: -papi-primary-alpha-015;
+    -fx-border-color: -papi-primary-alpha-035;
+    -fx-border-width: 1.5px;
+    -fx-background-radius: 12px;
+    -fx-border-radius: 12px;
 }
 
 .profile-list-item:selected > .rippler-container > BorderPane > .two-line-list-item > .first-line > .title {
-    -fx-text-fill: -monet-on-secondary-container;
+    -fx-text-fill: -papi-primary-lighter;
     -fx-font-weight: bold;
 }
 
 .profile-list-item:selected .svg {
-    -fx-fill: -monet-on-secondary-container;
+    -fx-fill: -papi-text;
 }
 
+/* === NOTICE PANE === */
 .notice-pane > .label {
-    -fx-text-fill: -monet-on-surface;
+    -fx-text-fill: -papi-primary;
     -fx-font-size: 20;
     -fx-wrap-text: true;
     -fx-text-alignment: CENTER;
@@ -244,15 +309,12 @@
 
 .class-title {
     -fx-font-size: 12px;
-    -fx-padding: 8 16 8 16;
+    -fx-padding: 16 16 8 16;
+    -fx-text-fill: -papi-text;
 }
 
 .class-title Text {
-    -fx-fill: -monet-on-surface;
-}
-
-.class-title Rectangle {
-    -fx-fill: -monet-on-surface-variant;
+    -fx-fill: -papi-text;
 }
 
 .advanced-list-box-item {
@@ -263,12 +325,9 @@
     -fx-spacing: 0;
 }
 
-.no-padding .advanced-list-box-content {
-    -fx-padding: 0 0 0 0;
-}
-
+/* === ICONED ITEMS === */
 .iconed-item {
-    -jfx-rippler-fill: -monet-secondary-container;
+    -jfx-rippler-fill: -papi-primary-alpha-040;
 }
 
 .iconed-item .iconed-item-container {
@@ -279,7 +338,7 @@
 }
 
 .iconed-menu-item {
-    -jfx-rippler-fill: -monet-secondary-container;
+    -jfx-rippler-fill: -papi-primary-alpha-040;
 }
 
 .iconed-menu-item .iconed-item-container {
@@ -293,246 +352,313 @@
     -fx-padding: 8 16 8 16;
 }
 
+/* === POPUP MENU OSCURO === */
 .popup-menu .scroll-bar .thumb {
-    -fx-fill: -monet-surface-tint;
-}
-
-.popup-menu .scroll-pane > .scroll-bar:vertical,
-.popup-menu .scroll-pane > .scroll-bar:horizontal {
-    -fx-opacity: 0;
+    -fx-fill: rgba(255, 255, 255, 0.3);
 }
 
 .popup-menu-content {
     -fx-padding: 4 0 4 0;
+    -fx-effect: none;
 }
 
+/* === ALL POPUP MENUS AND CONTEXT MENUS - DARK === */
+.context-menu, .popup-menu, .jfx-popup-container, .combo-box-popup {
+    -fx-background-color: -papi-overlay !important;
+    -fx-background-radius: 12px;
+    -fx-border-color: -papi-primary-alpha-010;
+    -fx-border-width: 1px;
+    -fx-border-radius: 12px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.8), 20, 0.3, 0, 8);
+}
+
+.combo-box-popup .list-view {
+    -fx-background-color: -papi-overlay !important;
+}
+
+.combo-box-popup .list-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: -papi-text;
+}
+
+.combo-box-popup .list-cell:hover {
+    -fx-background-color: -papi-primary-alpha-015;
+}
+
+.combo-box-popup .list-cell:selected {
+    -fx-background-color: -papi-primary-alpha-025;
+    -fx-text-fill: -papi-primary;
+}
+
+/* === TWO LINE LIST - OSCURO === */
 .two-line-list-item > .first-line > .title {
-    -fx-text-fill: -monet-on-surface;
+    -fx-text-fill: -papi-text !important;
     -fx-font-size: 15px;
     -fx-padding: 0 8 0 0;
 }
 
 .two-line-list-item > HBox > .subtitle {
-    -fx-text-fill: -monet-on-surface-variant;
+    -fx-text-fill: rgba(255, 255, 255, 0.7) !important;
     -fx-font-weight: normal;
     -fx-font-size: 12px;
 }
 
-.two-line-list-item > .second-line > .subtitle Text {
-    -fx-fill: -monet-on-surface-variant;
-}
-
-.two-line-list-item > .first-line .scroll-bar {
-    -fx-opacity: 0;
-    -fx-max-height: 0;
-    -fx-min-height: 0;
-    -fx-pref-height: 0;
-}
-
-.two-line-list-item > .first-line .tag {
-    -fx-text-fill: -monet-on-secondary-container;
-    -fx-background-color: -monet-secondary-container;
-    -fx-background-radius: 2;
+.two-line-list-item > .first-line > .tag {
+    -fx-text-fill: -papi-primary;
+    -fx-background-color: -papi-primary-alpha-015;
+    -fx-border-color: transparent;
     -fx-padding: 2;
     -fx-font-weight: normal;
     -fx-font-size: 12px;
 }
 
-.two-line-list-item > .first-line .tag:warning {
-    -fx-text-fill: -monet-on-error-container;
-    -fx-background-color: -fixed-warning-tag-background;
-}
-
 .two-line-item-second-large {
-
 }
 
 .two-line-item-second-large > .first-line > .title, .two-line-item-second-large-title {
-    -fx-text-fill: -monet-on-surface-variant;
+    -fx-text-fill: -papi-text-tertiary;
     -fx-font-weight: normal;
     -fx-font-size: 12px;
 }
 
 .two-line-item-second-large > HBox > .subtitle {
-    -fx-text-fill: -monet-on-surface;
+    -fx-text-fill: -papi-text;
     -fx-font-size: 15px;
-}
-
-.terracotta-hint Text {
-    -fx-fill: -monet-on-surface;
-}
-
-.game-crash-window {
-    -fx-background-color: -monet-surface-container;
-}
-
-.game-crash-window .crash-reason-text-flow Text {
-    -fx-fill: -monet-on-surface;
-}
-
-.game-crash-window .crash-reason-text-flow .hyperlink {
-    -fx-fill: -monet-primary;
 }
 
 .wrap-text > HBox > .subtitle {
     -fx-wrap-text: true;
 }
 
+/* === BUBBLE OSCURO === */
 .bubble {
-    -fx-background-color: -monet-inverse-surface-transparent-80;
-    -fx-background-radius: 2px;
+    -fx-background-color: -papi-overlay;
+    -fx-background-radius: 12px;
+    -fx-text-fill: white;
 }
 
 .bubble > HBox > .two-line-list-item > .first-line > .title,
 .bubble > HBox > .two-line-list-item > HBox > .subtitle {
-    -fx-text-fill: -monet-inverse-on-surface;
+    -fx-text-fill: white;
 }
 
-.bubble .svg {
-    -fx-fill: -monet-inverse-on-surface;
-}
-
-.sponsor-pane {
-    -fx-cursor: hand;
-}
-
-.installer-item-wrapper {
-    -fx-background-color: -monet-surface;
-    -fx-background-radius: 4;
-    -fx-pref-width: 180px;
-}
-
-.installer-item-wrapper:card {
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.26), 10, 0.12, -1, 2);
-}
-
-.installer-item-wrapper .installer-item:list-item {
+/* === INSTALLER ITEMS === */
+.installer-item {
     -fx-padding: 8px;
-    -fx-border-color: -monet-outline-variant;
+}
+
+.installer-item:list-item {
+    -fx-border-color: rgba(255, 255, 255, 0.08);
     -fx-border-width: 0 0 1 0;
     -fx-alignment: center-left;
 }
 
-.installer-item-wrapper .installer-item:list-item > .installer-item-name {
-    -fx-pref-width: 100px;
+.installer-item:list-item > .installer-item-name {
+    -fx-pref-width: 80px;
 }
 
-.installer-item-wrapper .installer-item:list-item > .installer-item-status {
+.installer-item:list-item > .installer-item-status {
     -fx-max-width: infinity;
 }
 
-.installer-item-wrapper .installer-item:card {
+.installer-item:card {
+    -fx-background-color: -papi-surface;
+    -fx-background-radius: 14px;
     -fx-alignment: center;
+    -fx-pref-width: 180px;
 }
 
-/*******************************************************************************
- *                                                                             *
- * Main Page                                                                   *
- *                                                                             *
- ******************************************************************************/
-
-.launch-pane {
-    -fx-max-height: 57px;
-    -fx-min-height: 57px;
-    -fx-max-width: 230px;
-    -fx-min-width: 230px;
+/* === MAIN PAGE / LAUNCH BUTTON - NEW LAYOUT === */
+/* Contenedor del área de lanzamiento - abajo a la derecha */
+.launch-container {
+    -fx-spacing: 8;
+    -fx-alignment: bottom-right;
 }
 
-.launch-pane > .jfx-button {
-    -fx-translate-y: 1px;
-    -fx-max-height: 55px;
-    -fx-min-height: 55px;
-    -fx-background-color: -monet-primary-container;
-    -fx-opacity: 1; /* Override the opacity of disabled button */
+/* ComboBox de versión - a la derecha */
+.version-combo-box {
+    -fx-background-color: -papi-surface-alt;
+    -fx-background-radius: 12px;
+    -fx-border-color: -papi-border;
+    -fx-border-width: 1px;
+    -fx-border-radius: 12px;
+    -fx-text-fill: -papi-text;
+    -fx-prompt-text-fill: -papi-text-tertiary;
+    -fx-font-size: 13px;
+    -fx-pref-width: 280px;
+    -fx-pref-height: 50px;
+    -fx-min-width: 280px;
+    -fx-max-width: 280px;
+    -fx-padding: 0 12 0 12;
+}
+
+.version-combo-box .jfx-rippler {
+    -jfx-rippler-fill: -papi-primary-alpha-030;
+}
+
+.version-combo-box:focused {
+    -fx-border-color: -papi-primary;
+    -fx-border-width: 2px;
+    -fx-background-color: -papi-overlay;
+}
+
+.version-combo-box .list-cell {
+    -fx-text-fill: -papi-text;
+    -fx-background-color: transparent;
+    -fx-padding: 8 12 8 12;
+}
+
+.version-combo-box .list-view {
+    -fx-background-color: -papi-overlay;
+    -fx-background-radius: 12px;
+    -fx-border-color: -papi-primary-alpha-015;
+    -fx-border-width: 1px;
+    -fx-border-radius: 12px;
+    -fx-effect: dropshadow(gaussian, -papi-shadow, 15, 0.2, 0, 5);
+}
+
+.version-combo-box .list-cell:hover {
+    -fx-background-color: -papi-primary-alpha-015;
+}
+
+.version-combo-box .list-cell:selected {
+    -fx-background-color: -papi-primary-alpha-025;
+    -fx-text-fill: -papi-primary;
+}
+
+/* Botón de iniciar Minecraft - debajo del combo */
+.launch-button {
+    -fx-background-color: -papi-primary;
+    -fx-background-radius: 12px;
     -fx-cursor: hand;
+    -fx-pref-width: 280px;
+    -fx-pref-height: 50px;
+    -fx-effect: none;
+    -fx-border-width: 0;
 }
 
-.launch-pane > .jfx-button.launch-button {
-    -fx-max-width: 207px;
-    -fx-min-width: 207px;
-    -fx-border-width: 0 3px 0 0;
-    -fx-border-color: -monet-on-surface-variant;
-    -fx-background-radius: 4px 0 0 4px;
-}
-
-.launch-pane > .jfx-button.menu-button {
-    -fx-max-width: 20px;
-    -fx-min-width: 20px;
-    -fx-font-size: 15px;
-    -fx-background-radius: 0 4px 4px 0;
-}
-
-.launch-pane > .jfx-button > StackPane > .jfx-rippler {
-    -jfx-rippler-fill: -monet-on-primary-container;
+.launch-button > StackPane > .jfx-rippler {
+    -jfx-rippler-fill: rgba(0, 0, 0, 0.2);
     -jfx-mask-type: CIRCLE;
-    -fx-padding: 0;
 }
 
-.launch-pane > .jfx-button, .jfx-button * {
-    -fx-text-fill: -monet-on-primary-container;
-    -fx-font-size: 14px;
+.launch-button:hover {
+    -fx-background-color: -papi-primary-lighter;
+    -fx-effect: none;
 }
 
-.launch-pane .svg {
-    -fx-fill: -monet-on-primary-container;
+.launch-button:pressed {
+    -fx-background-color: -papi-primary-darker;
+    -fx-effect: none;
 }
 
-/*******************************************************************************
- *                                                                             *
- * JFX Tab Pane                                                                *
- *                                                                             *
- ******************************************************************************/
+.launch-button:focused {
+    -fx-effect: none;
+    -fx-border-width: 0;
+}
 
+.launch-button:disabled {
+    -fx-background-color: rgba(80, 80, 80, 0.6);
+    -fx-opacity: 0.5;
+}
+
+.launch-button, .launch-button * {
+    -fx-text-fill: -papi-text;
+}
+
+.launch-label {
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -papi-text;
+}
+
+.version-label {
+    -fx-font-size: 12px;
+    -fx-text-fill: -papi-text-secondary;
+}
+
+.launch-pane > .jfx-button:pressed {
+    -fx-background-color: -papi-primary-darker;
+    -fx-effect: none;
+}
+
+.launch-pane > .jfx-button:focused {
+    -fx-effect: none;
+    -fx-border-width: 0;
+}
+
+.launch-pane > .jfx-button:disabled {
+    -fx-background-color: rgba(80, 80, 80, 0.6);
+    -fx-opacity: 0.5;
+}
+
+.launch-pane > .jfx-button, .launch-pane > .jfx-button * {
+    -fx-text-fill: -papi-text;
+    -fx-font-size: 15px;
+    -fx-font-weight: 700;
+}
+
+.launch-pane > Rectangle {
+    -fx-fill: transparent;
+}
+
+/* === TOOLTIP OSCURO === */
+.tooltip {
+    -fx-text-fill: -papi-text;
+    -fx-background-color: -papi-overlay;
+    -fx-background-radius: 10px;
+    -fx-padding: 8 12 8 12;
+    -fx-effect: dropshadow(gaussian, -papi-shadow, 20, 0.3, 0, 8);
+}
+
+/* === HYPERLINKS — ALL WHITE === */
+.hyperlink {
+    -fx-text-fill: #FFFFFF;
+    -fx-border-color: transparent;
+}
+
+.hyperlink:visited {
+    -fx-text-fill: #FFFFFF;
+}
+
+/* === JFX TAB PANE - OSCURO === */
 .tab-header-background {
-    -fx-background-color: -monet-surface;
+    -fx-background-color: -papi-surface;
 }
 
 .tab-selected-line {
-    -fx-background-color: derive(-monet-primary-container, -30%);
+    -fx-background-color: -papi-primary;
 }
 
-/* TODO: It seems not actually used */
 .tab-rippler {
-    -jfx-rippler-fill: derive(-monet-primary-container, 30%);
+    -jfx-rippler-fill: -papi-primary-alpha-035;
 }
 
 .jfx-tab-pane .jfx-rippler {
-    -jfx-rippler-fill: white;
+    -jfx-rippler-fill: -papi-primary-alpha-030;
 }
 
 .tab-label {
     -fx-font-size: 16;
-}
-
-.tab-label {
     -fx-padding: 10 17 10 17;
+    -fx-text-fill: -papi-text-secondary;
 }
 
 .add-account-tab-header .tab-label {
     -fx-font-size: 12;
 }
 
-/*******************************************************************************
- *                                                                             *
- * JFX Dialog Layout                                                           *
- *                                                                             *
- ******************************************************************************/
-
+/* === JFX DIALOG LAYOUT - OSCURO === */
 .dialog-trigger {
-    -fx-background-color: WHITE;
-    -jfx-button-type: RAISED;
-    -fx-font-size: 14.0px;
+    -fx-background-color: -papi-dialog-bg;
 }
 
 .jfx-dialog-layout {
-    -fx-background-radius: 4px;
-    -fx-padding: 24px 24px 16px 24px;
-    -fx-background-color: -monet-surface-container-high;
-    -fx-text-fill: -monet-on-surface;
+    -fx-padding: 24.0px 24.0px 16.0px 24.0px;
+    -fx-text-fill: -papi-text;
 }
 
 .jfx-layout-heading {
-    -fx-font-weight: BOLD;
     -fx-font-size: 20.0px;
     -fx-alignment: center-left;
     -fx-padding: 5.0 0.0 5.0 0.0;
@@ -543,10 +669,6 @@
     -fx-wrap-text: true;
 }
 
-.jfx-layout-body Text {
-    -fx-fill: -monet-on-surface;
-}
-
 .jfx-layout-actions {
     -fx-pref-width: 400;
     -fx-padding: 10.0px 0.0 0.0 0.0;
@@ -554,119 +676,103 @@
 }
 
 .dialog-error {
-    -fx-text-fill: -monet-error;
+    -fx-text-fill: -papi-error;
     -fx-padding: 0.7em 0.8em;
 }
 
 .dialog-accept {
-    -fx-text-fill: -monet-primary;
+    -fx-text-fill: -papi-primary;
     -fx-padding: 0.7em 0.8em;
 }
 
 .dialog-cancel {
-    -fx-text-fill: -monet-on-surface-variant;
     -fx-padding: 0.7em 0.8em;
 }
 
-.task-executor-dialog-layout {
-    -fx-background-radius: 4px;
-    -fx-background-color: -monet-surface-container-high;
-    -fx-text-fill: -monet-on-surface;
-}
-
-/*******************************************************************************
- *                                                                             *
- * Microsoft Login Dialog                                                      *
- *                                                                             *
- ******************************************************************************/
-
-.microsoft-login-dialog:bodyonly {
-    -fx-padding: 0px 0px 0px 0px;
-}
-
-.method-title {
-    -fx-text-fill: -monet-on-surface;
-    -fx-font-weight: bold;
-}
-
-.method-desc {
-    -fx-text-fill: -monet-outline;
-    -fx-font-size: 0.9em;
-    -fx-line-spacing: 2;
-    -fx-wrap-text: true;
-    -fx-text-alignment: center;
-}
-
-.code-box {
-    -fx-background-color: -monet-surface-variant;
-    -fx-background-radius: 6;
-    -fx-padding: 0 10 0 10;
-    -fx-alignment: center;
-}
-
-.code-box .code-label {
-    -fx-font-size: 22px;
-    -fx-font-weight: bold;
-    -fx-text-fill: -monet-primary;
-}
-
-/*******************************************************************************
- *                                                                             *
- * JFX Pop Up                                                                  *
- *                                                                             *
- ******************************************************************************/
-
+/* === JFX POP UP - OSCURO - ALL POPUPS BLACK === */
 .jfx-popup-overlay-pane {
+    -fx-background-color: rgba(0, 0, 0, 0.3);
+}
+
+/* === ALERT DIALOG - FONDO NEGRO === */
+.dialog-pane {
+    -fx-background-color: -papi-overlay;
+    -fx-border-color: -papi-border;
+    -fx-border-width: 1px;
+}
+
+.dialog-pane .header-panel {
     -fx-background-color: transparent;
 }
 
+.dialog-pane .content {
+    -fx-background-color: #141414;
+    -fx-text-fill: -papi-text;
+}
+
+.dialog-pane .scroll-pane,
+.dialog-pane .scroll-pane .viewport {
+    -fx-background-color: #141414;
+    -fx-background: #141414;
+}
+
+.dialog-pane .button-bar {
+    -fx-background-color: transparent;
+}
+
+.dialog-pane .button {
+    -fx-background-color: -papi-primary-alpha-020;
+    -fx-text-fill: -papi-text;
+    -fx-background-radius: 8px;
+}
+
+.dialog-pane .button:hover {
+    -fx-background-color: -papi-primary-alpha-040;
+}
+
 .jfx-popup-container {
-    -fx-background-color: -monet-surface;
-    -fx-background-radius: 4;
+    -fx-background-color: -papi-overlay;
+    -fx-background-radius: 12px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.8), 25, 0.3, 0, 10);
+    -fx-border-color: -papi-primary-alpha-010;
+    -fx-border-width: 1px;
+    -fx-border-radius: 12px;
 }
 
 .popup-list-view {
     -fx-pref-width: 150.0px;
+    -fx-background-color: transparent;
 }
 
-/*******************************************************************************
- *                                                                             *
- * JFX Snack Bar                                                               *
- *                                                                             *
- ******************************************************************************/
+.popup-menu {
+    -fx-background-color: -papi-overlay;
+    -fx-background-radius: 12px;
+    -fx-border-color: -papi-primary-alpha-010;
+    -fx-border-width: 1px;
+    -fx-border-radius: 12px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.8), 20, 0.3, 0, 8);
+}
 
 .jfx-snackbar-content {
-    -fx-background-color: -monet-inverse-surface;
-    -fx-padding: 5;
-    -fx-spacing: 5;
+    -fx-background-color: -papi-overlay;
 }
 
 .jfx-snackbar-toast {
-    -fx-text-fill: -monet-inverse-on-surface;
+    -fx-text-fill: -papi-text;
 }
 
 .jfx-snackbar-action {
-    -fx-text-fill: -monet-inverse-primary;
+    -fx-text-fill: -papi-primary;
 }
 
-/*******************************************************************************
- *                                                                             *
- * JFX Icons                                                                   *
- *                                                                             *
- ******************************************************************************/
-
+/* === ICONS === */
 .icon {
-    -fx-fill: #FE774D;
+    -fx-fill: -papi-text;
     -fx-padding: 10.0;
     -fx-cursor: hand;
 }
 
-/*******************************************************************************
- *                                                                             *
- * JFX Tool Bar                                                                *
- *                                                                             *
- ******************************************************************************/
-
+/* === JFX TOOL BAR - OSCURO === */
 .jfx-tool-bar {
     -fx-font-size: 13.0;
     -fx-pref-width: 100.0%;
@@ -680,13 +786,8 @@
 }
 
 .jfx-tool-bar.background {
-    -fx-background-color: -monet-primary-container;
+    -fx-background-color: -papi-overlay;
 }
-
-/*.jfx-tool-bar HBox {*/
-/*    -fx-alignment: center-left;*/
-/*    -fx-padding: 0.0 5.0;*/
-/*}*/
 
 .jfx-tool-bar .jfx-decorator-button {
     -fx-min-width: 40px;
@@ -699,15 +800,11 @@
 }
 
 .jfx-tool-bar .jfx-decorator-button .svg {
-    -fx-fill: -monet-on-primary-container;
+    -fx-fill: -papi-text;
 }
 
 .jfx-tool-bar Label {
-    -fx-text-fill: -monet-on-surface;
-}
-
-.jfx-tool-bar.gray-background Label {
-    -fx-text-fill: BLACK;
+    -fx-text-fill: -papi-text;
 }
 
 .jfx-tool-bar .jfx-options-burger {
@@ -719,257 +816,253 @@
 }
 
 .jfx-tool-bar .jfx-rippler {
-    -fx-text-fill: -monet-on-surface;
+    -jfx-rippler-fill: -papi-primary-alpha-040;
 }
 
 .jfx-tool-bar-second {
     -fx-pref-height: 42;
     -fx-padding: 2 2 2 2;
-    -fx-background-color: -monet-primary-container;
+    -fx-background-color: -papi-surface;
     -fx-alignment: CENTER-LEFT;
     -fx-spacing: 8;
 }
 
 .jfx-tool-bar-second .label {
-    -fx-text-fill: -monet-on-primary-container;
+    -fx-text-fill: -papi-text;
     -fx-font-size: 16;
     -fx-font-weight: bold;
 }
 
 .jfx-tool-bar-second .jfx-rippler {
-    -jfx-rippler-fill: -monet-on-surface;
+    -jfx-rippler-fill: -papi-primary-alpha-040;
 }
 
 .jfx-tool-bar-button {
-    -fx-text-fill: -monet-on-surface;
     -fx-toggle-icon4-size: 37px;
     -fx-pref-height: -fx-toggle-icon4-size;
     -fx-max-height: -fx-toggle-icon4-size;
     -fx-min-height: -fx-toggle-icon4-size;
     -fx-background-radius: 5px;
     -fx-background-color: transparent;
-    -jfx-toggle-color: -monet-on-surface;
+    -jfx-toggle-color: -papi-primary-alpha-020;
     -jfx-untoggle-color: transparent;
 }
 
 .jfx-tool-bar-button .icon {
-    -fx-fill: rgb(204.0, 204.0, 51.0);
+    -fx-fill: -papi-text;
     -fx-padding: 10.0;
 }
 
-.jfx-decorator-button {
-    -fx-max-width: 40px;
-    -fx-background-radius: 5px;
-    -fx-max-height: 40px;
-    -fx-background-color: transparent;
-}
-
-.jfx-decorator-button .icon {
-    -fx-fill: rgb(204.0, 204.0, 51.0);
-    -fx-padding: 0.0;
-}
-
-.jfx-decorator-button .jfx-rippler {
+.jfx-tool-bar-button .jfx-rippler {
+    -jfx-rippler-fill: -papi-primary;
     -jfx-mask-type: CIRCLE;
-    -fx-padding: 0.0;
 }
 
-/*******************************************************************************
- *                                                                             *
- * JFX Radio Button                                                            *
- *                                                                             *
- ******************************************************************************/
-
+/* === JFX RADIO BUTTON - OSCURO === */
 .jfx-radio-button {
-    -jfx-selected-color: -monet-primary;
-    -jfx-unselected-color: -monet-on-surface-variant;
-    -fx-text-fill: -monet-on-surface;
+    -jfx-selected-color: -papi-primary;
 }
 
-/*******************************************************************************
- *                                                                             *
- * JFX Slider                                                                  *
- *                                                                             *
- ******************************************************************************/
-
-.jfx-slider .track,
-.jfx-slider:vertical .track {
-    -fx-background-color: -monet-secondary-container;
-    -fx-background-radius: 5;
-    -fx-background-insets: 0;
-    -fx-pref-width: 2px;
-    -fx-pref-height: 2px;
+.jfx-radio-button .radio {
+    -fx-stroke-width: 2.0px;
+    -fx-fill: transparent;
+    -fx-border-color: rgba(255, 255, 255, 0.3);
+    -fx-border-width: 2px;
+    -fx-background-radius: 50%;
+    -fx-border-radius: 50%;
 }
 
-.jfx-slider .thumb,
-.jfx-slider:focused .thumb {
-    -fx-background-color: -monet-primary;
-    -fx-background-radius: 20;
-    -fx-background-insets: 0;
+.jfx-radio-button .dot {
+    -fx-fill: -papi-primary;
 }
 
-.jfx-slider .colored-track {
-    -fx-background-color: -monet-primary;
-    -fx-background-radius: 5 0 0 5;
-    -fx-background-insets: 0;
+/* === JFX SLIDER - OSCURO === */
+.svg-slider .thumb {
+    -fx-stroke: -papi-primary;
+    -fx-fill: -papi-primary;
 }
 
-.jfx-slider .slider-value {
-    -fx-stroke: -monet-inverse-on-surface;
-    -fx-font-size: 10;
+.jfx-slider:disabled {
+    -fx-opacity: 0.4;
 }
 
-.jfx-slider .animated-thumb {
-    -fx-pref-width: 30px;
-    -fx-pref-height: 30px;
-    -fx-background-color: -monet-inverse-surface;
-    -fx-background-radius: 50% 50% 50% 0%;
-    -fx-background-insets: 0;
+.jfx-slider {
+    -jfx-indicator-position: right;
 }
 
-/*******************************************************************************
-*                                                                              *
-* JFX Rippler                                                                  *
-*                                                                              *
-*******************************************************************************/
+.jfx-slider .thumb {
+    -fx-background-color: -papi-primary;
+}
 
+/* === JFX RIPPLER === */
 .jfx-rippler:hover {
     -fx-cursor: hand;
 }
 
-/*******************************************************************************
-*                                                                              *
-* JFX Button                                                                   *
-*                                                                              *
-*******************************************************************************/
-
+/* === JFX BUTTON - OSCURO === */
+/* BOTONES LIMPIOS: VOID GREEN theme */
 .jfx-button {
     -jfx-disable-visual-focus: true;
     -fx-cursor: hand;
+    -fx-background-color: -papi-primary;
+    -fx-background-radius: 10px;
+    -fx-text-fill: #FFFFFF;
+    -fx-font-size: 13px;
+    -fx-font-weight: 600;
+    -fx-padding: 10 18 10 18;
 }
 
 .jfx-button .jfx-rippler {
-    -jfx-rippler-fill: -monet-on-surface;
+    -jfx-rippler-fill: rgba(0, 0, 0, 0.15);
     -jfx-mask-type: CIRCLE;
     -fx-padding: 0.0;
 }
 
+.jfx-button:hover {
+    -fx-background-color: -papi-primary-lighter;
+}
+
+.jfx-button:pressed {
+    -fx-background-color: -papi-primary-darker;
+}
+
+.jfx-button:focused {
+    -fx-opacity: 0.25;
+}
+
+.jfx-button:disabled {
+    -fx-background-color: -papi-surface-alt;
+    -fx-opacity: 0.5;
+}
+
+/* === JFX DECORATOR BUTTON - CONTROLES DE VENTANA === */
+.jfx-decorator-button {
+    -fx-max-width: 40px;
+    -fx-background-radius: 14px;
+    -fx-max-height: 40px;
+    -fx-background-color: transparent;
+    -jfx-toggle-color: -papi-primary-alpha-020;
+    -jfx-untoggle-color: transparent;
+}
+
+.jfx-decorator-button .icon,
+.jfx-decorator-button .svg {
+    -fx-fill: -papi-text;
+    -fx-padding: 0.0;
+}
+
+.jfx-decorator-button .jfx-rippler {
+    -jfx-rippler-fill: -papi-primary-alpha-040;
+    -jfx-mask-type: CIRCLE;
+    -fx-padding: 0.0;
+}
+
+.jfx-decorator-button:hover {
+    -fx-background-color: -papi-primary-lighter;
+    -fx-background-radius: 14px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.35), 8, 0.1, 0, 3);
+}
+
 .jfx-button-raised {
-    -fx-background-color: -monet-primary;
+    -fx-background-color: -fx-base-color;
+    -fx-background-radius: 12px;
 }
 
 .jfx-button-raised .jfx-rippler {
-    -jfx-rippler-fill: -monet-on-primary;
+    -jfx-rippler-fill: rgba(255, 255, 255, 0.25);
     -jfx-mask-type: CIRCLE;
     -fx-padding: 0.0;
 }
 
 .jfx-button-raised, .jfx-button-raised * {
-    -fx-text-fill: -monet-on-primary;
+    -fx-text-fill: -papi-text;
     -fx-font-size: 14px;
+    -fx-font-weight: 600;
 }
 
 .jfx-button-border {
-    -fx-background-color: transparent;
-    -fx-border-color: -monet-outline;
-    -fx-border-radius: 5px;
-    -fx-border-width: 0.2px;
-    -fx-padding: 8px;
+    -fx-background-color: -papi-surface;
+    -fx-background-radius: 10px;
+    -fx-border-color: -papi-border;
+    -fx-border-width: 1.5px;
+    -fx-border-radius: 10px;
+    -fx-padding: 10 18 10 18;
+    -fx-text-fill: -papi-text;
+    -fx-cursor: hand;
 }
 
-.jfx-button-border, .jfx-button-border * {
-    -fx-text-fill: -monet-primary;
+.jfx-button-border:hover {
+    -fx-background-color: -papi-primary-alpha-010;
+    -fx-border-color: -papi-primary;
+}
+
+.jfx-button-border:pressed {
+    -fx-background-color: -papi-primary-alpha-015;
+    -fx-border-color: -papi-primary;
+}
+
+.jfx-button-border:focused {
+    -fx-opacity: 0.2;
+}
+
+.jfx-button-border .jfx-rippler {
+    -jfx-rippler-fill: -papi-primary-alpha-025;
+    -jfx-mask-type: CIRCLE;
 }
 
 .jfx-button-raised-round {
-    -fx-background-color: -monet-primary-container;
+    -fx-background-color: -papi-primary;
     -fx-background-radius: 50px;
 }
 
-.menu-up-down-button .label {
-    -fx-text-fill: -monet-on-surface;
-}
-
-/*******************************************************************************
-*                                                                              *
-* JFX Check Box                                                                *
-*                                                                              *
-*******************************************************************************/
-
+/* === JFX CHECK BOX - OSCURO === */
 .jfx-check-box {
     -fx-font-weight: BOLD;
-    -fx-text-fill: -monet-on-surface;
-    -jfx-checked-color: -monet-primary;
-    -jfx-unchecked-color: transparent;
+    -jfx-checked-color: -papi-primary;
 }
 
-.table-view .jfx-check-box .jfx-rippler {
-    -jfx-rippler-disabled: true;
+/* === JFX PROGRESS BAR - OSCURO === */
+.jfx-progress-bar {
+    -fx-pref-width: 500.0;
 }
 
-/*******************************************************************************
-*                                                                              *
-* JFX Progress Bar                                                             *
-*                                                                              *
-*******************************************************************************/
-
-
-.jfx-progress-bar > .track {
-    -fx-background-color: -monet-secondary-container;
-}
-
-.jfx-progress-bar > .bar {
-    -fx-background-color: -monet-primary;
-    -fx-padding: 2;
-}
-
-.jfx-progress-bar > .track,
-.jfx-progress-bar > .bar {
-    -fx-background-radius: 2;
+.jfx-progress-bar > .track, .jfx-progress-bar > .bar {
+    -fx-background-radius: 0;
     -fx-background-insets: 0;
 }
 
-/*******************************************************************************
-*                                                                              *
-* JFX Textfield                                                                *
-*                                                                              *
-*******************************************************************************/
+.jfx-progress-bar > .track {
+    -fx-background-color: rgba(255, 255, 255, 0.15);
+}
 
+.jfx-progress-bar > .bar {
+    -fx-background-color: -papi-primary;
+}
+
+/* === JFX TEXTFIELD - OSCURO === */
 .jfx-text-field, .jfx-password-field, .jfx-text-area {
-    -fx-background-color: -monet-surface-container-highest;
-    -fx-highlight-fill: -monet-primary;
-    -fx-text-fill: -monet-on-surface;
+    -fx-background-color: -papi-surface;
+    -fx-background-radius: 12px;
     -fx-font-weight: BOLD;
-    -fx-prompt-text-fill: -monet-on-surface-variant;
+    -fx-prompt-text-fill: -papi-text-tertiary;
     -fx-alignment: top-left;
     -fx-max-width: 1000000000;
-    -jfx-focus-color: -monet-primary;
-    -fx-padding: 8;
+    -jfx-focus-color: -papi-primary;
+    -fx-padding: 12;
     -jfx-unfocus-color: transparent;
+    -fx-text-fill: -papi-text;
+    -fx-border-color: -papi-border;
+    -fx-border-width: 1px;
+    -fx-border-radius: 12px;
 }
 
-.jfx-text-field .context-menu {
-    -fx-background-color: -monet-surface-container;
-    -fx-text-fill: -monet-on-surface;
+.jfx-text-area .viewport {
+    -fx-background-color: -papi-dialog-bg;
 }
 
-.jfx-text-field .context-menu .menu-item:focused {
-    -fx-background-color: -monet-secondary-container;
-    -fx-text-fill: -monet-on-secondary-container;
-}
-
-/*******************************************************************************
-*                                                                              *
-* JFX List View                                                                *
-*                                                                              *
-*******************************************************************************/
-
+/* === JFX LIST VIEW - OSCURO === */
 .no-padding .list-cell {
     -fx-padding: 0;
-}
-
-.no-padding .combo-box-popup > .list-view > .virtual-flow > .clipped-container > .sheet > .list-cell {
-    -fx-padding: 4 0 4 5;
 }
 
 .jfx-list-cell, .list-cell {
@@ -978,17 +1071,17 @@
 
 .list-cell:selected, .jfx-list-cell:selected,
 .list-cell:hover, .jfx-list-cell:hover {
-    -fx-text-fill: black;
+    -fx-text-fill: -papi-text;
 }
 
 .jfx-list-cell .jfx-rippler {
-    -jfx-rippler-fill: -monet-primary-container;
+    -jfx-rippler-fill: -papi-primary-alpha-035;
 }
 
-/*.list-cell:odd:selected > .jfx-rippler > StackPane,*/
-/*.list-cell:even:selected > .jfx-rippler > StackPane {*/
-/*    -fx-background-color: derive(-monet-primary, 30%);*/
-/*}*/
+.list-cell:odd:selected > .jfx-rippler > StackPane,
+.list-cell:even:selected > .jfx-rippler > StackPane {
+    -fx-background-color: -papi-primary-alpha-015;
+}
 
 .jfx-list-view {
     -fx-background-insets: 0.0;
@@ -1016,67 +1109,61 @@
     -fx-background-color: transparent;
 }
 
-.no-horizontal-scrollbar .scroll-bar:horizontal {
-    -fx-opacity: 0;
-    -fx-max-height: 0;
-    -fx-min-height: 0;
-    -fx-pref-height: 0;
-}
-
+/* === OPTIONS LIST - GLASS CARD === */
 .options-list {
     -fx-background-color: transparent;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.26), 5, 0.06, -0.5, 1);
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.5), 15, 0.1, 0, 5);
 }
 
 .depth-0 {
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0), 0, 0, 0, 0);
 }
 
 .depth-1 {
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.26), 10, 0.12, -1, 2);
 }
 
 .depth-2 {
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.26), 15, 0.16, 0, 4);
 }
 
 .depth-3 {
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.26), 20, 0.19, 0, 6);
 }
 
 .depth-4 {
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.26), 25, 0.25, 0, 8);
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.7), 25, 0.25, 0, 10);
 }
 
 .depth-5 {
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.26), 30, 0.3, 0, 10);
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.8), 30, 0.3, 0, 12);
 }
 
 .padding-8 {
     -fx-padding: 8px;
 }
 
+/* === CARD - GLASSMORPHISM OSCURO === */
 .card {
-    -fx-background-color: -monet-surface-container-low-transparent-80;
-    -fx-background-radius: 4;
-    -fx-padding: 8px;
-
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.26), 10, 0.12, -1, 2);
-}
-
-.card-no-padding {
-    -fx-background-color: -monet-surface-container-low-transparent-80;
-    -fx-background-radius: 4;
-
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.26), 10, 0.12, -1, 2);
+    -fx-background-color: -papi-surface;
+    -fx-background-radius: 14px;
+    -fx-padding: 12px;
+    -fx-border-color: rgba(255, 255, 255, 0.08);
+    -fx-border-width: 1px;
+    -fx-border-radius: 14px;
 }
 
 .card-non-transparent {
-    -fx-background-color: -monet-surface-container-low;
-    -fx-background-radius: 4;
-    -fx-padding: 8px;
+    -fx-background-color: -papi-overlay;
+    -fx-background-radius: 14px;
+    -fx-padding: 12px;
+}
 
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.26), 5, 0.06, -0.5, 1);
+.card:hover {
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.6), 15, 0.1, 0, 6);
+}
+
+.card:selected {
+    -fx-background-color: -papi-primary-alpha-020;
+    -fx-border-color: -papi-primary;
+    -fx-border-width: 2px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.6), 15, 0.1, 0, 6);
 }
 
 .card-list {
@@ -1084,58 +1171,31 @@
     -fx-spacing: 10;
 }
 
+/* === MD LIST CELL - OSCURO === */
 .md-list-cell {
-    -fx-border-color: -monet-outline-variant;
+    -fx-border-color: rgba(255, 255, 255, 0.08);
     -fx-border-width: 0 0 1 0;
+    -fx-background-color: -papi-surface;
+    -fx-background-radius: 12px;
 }
 
 .md-list-cell:selected {
-    -fx-background-color: -monet-secondary-container;
+    -fx-background-color: -papi-primary-alpha-015;
+    -fx-border-color: -papi-primary;
+    -fx-border-width: 0 0 2 0;
 }
 
-.mod-info-list-cell:warning {
-    -fx-background-color: -monet-error-container;
-}
-
-.resource-pack-list-cell:warning {
-    -fx-background-color: -monet-error-container;
-}
-
-.multi-file-item {
-    -fx-padding: 10 0 10 0;
-}
-
+/* === OPTIONS SUBLIST - OSCURO === */
 .options-sublist {
-    -fx-background-color: -monet-surface-container;
+    -fx-background-color: rgba(15, 15, 18, 0.6);
 }
 
 .options-list-item {
-    -fx-background-color: -monet-surface;
-    -fx-border-color: -monet-outline-variant;
-    -fx-border-width: 1 0 0 0;
-    -fx-padding: 10 16 10 16;
+    -fx-background-color: rgba(15, 15, 18, 0.5);
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-padding: 8 14 8 14;
     -fx-font-size: 12;
-}
-
-.options-sublist .options-list-item {
-    -fx-background-color: -monet-surface-container;
-}
-
-.options-sublist .multi-file-item {
-    -fx-padding: 10 10 10 10;
-}
-
-.options-list-item .svg {
-    -fx-fill: -monet-on-surface;
-    -fx-border-color: -monet-outline-variant;
-}
-
-.options-list-item .label {
-    -fx-text-fill: -monet-on-surface;
-}
-
-.options-list-item .label.subtitle {
-    -fx-text-fill: -monet-on-surface-variant;
 }
 
 .options-list-item.no-padding {
@@ -1147,87 +1207,49 @@
 }
 
 .options-list-item:first {
-    -fx-background-radius: 4 4 0 0;
+    -fx-background-radius: 12px 12px 0 0;
     -fx-border-width: 0;
 }
 
 .options-list-item:last {
-    -fx-background-radius: 0 0 4 4;
+    -fx-background-radius: 0 0 12px 12px;
 }
 
 .options-list-item:first:last {
-    -fx-background-radius: 4 4 4 4;
+    -fx-background-radius: 12px 12px 12px 12px;
     -fx-border-width: 0;
 }
 
-.options-sublist-wrapper > .container {
-    -fx-background-color: -monet-surface-container;
+.options-list-item-expand-button {
+    -fx-toggle-icon4-size: 20px;
+    -fx-pref-width: -fx-toggle-icon4-size;
+    -fx-max-width: -fx-toggle-icon4-size;
+    -fx-min-width: -fx-toggle-icon4-size;
+    -fx-pref-height: -fx-toggle-icon4-size;
+    -fx-max-height: -fx-toggle-icon4-size;
+    -fx-min-height: -fx-toggle-icon4-size;
+    -fx-background-radius: 50px;
+    -fx-background-color: transparent;
+    -jfx-toggle-color: -papi-primary-alpha-020;
+    -jfx-untoggle-color: transparent;
 }
 
-.options-sublist-wrapper .expand-icon .svg {
-    -fx-fill: -monet-on-surface-variant;
+.options-list-item-expand-button .jfx-rippler {
+    -jfx-rippler-fill: -papi-primary-alpha-035;
+    -jfx-mask-type: CIRCLE;
 }
 
-.options-sublist-wrapper .expand-icon .svg:disabled {
-    -fx-opacity: 0.4;
+/* === JFX TOGGLE BUTTON - OSCURO === */
+.jfx-toggle-button {
+    -jfx-toggle-color: -papi-primary;
 }
-
-/*******************************************************************************
-*                                                                              *
-* JFX Toggle Button                                                            *
-*                                                                              *
-*******************************************************************************/
-
-.jfx-toggle-button,
-.jfx-toggle-button:armed,
-.jfx-toggle-button:hover,
-.jfx-toggle-button:focused,
-.jfx-toggle-button:selected,
-.jfx-toggle-button:focused:selected {
-    -fx-background-color: TRANSPARENT, TRANSPARENT, TRANSPARENT, TRANSPARENT;
-    -fx-background-radius: 3px;
-    -fx-background-insets: 0px;
-
-    -jfx-toggle-color: -monet-primary;
-    -jfx-toggle-line-color: -monet-secondary-container;
-    -jfx-untoggle-color: -monet-outline;
-    -jfx-untoggle-line-color: -monet-surface-container-highest;
-    -jfx-size: 10;
-}
-
-
-.jfx-toggle-button Line {
-    -fx-stroke: -jfx-untoggle-line-color;
-}
-
-.jfx-toggle-button:selected Line {
-    -fx-stroke: -jfx-toggle-line-color;
-}
-
-.jfx-toggle-button Circle {
-    -fx-fill: -jfx-untoggle-color;
-}
-
-.jfx-toggle-button:selected Circle {
-    -fx-fill: -jfx-toggle-color;
-}
-
-.jfx-toggle-button .jfx-rippler {
-    -jfx-rippler-fill: -jfx-untoggle-line-color;
-}
-
-.jfx-toggle-button:selected .jfx-rippler {
-    -jfx-rippler-fill: -jfx-toggle-line-color;
-}
-
 
 .toggle-label {
     -fx-font-size: 14.0px;
 }
 
-/* unused */
 .toggle-icon1 .icon {
-    -fx-fill: #4285F4;
+    -fx-fill: #FFFFFF;
     -fx-padding: 20.0;
 }
 
@@ -1236,33 +1258,31 @@
     -fx-background-radius: 80px;
     -fx-pref-height: 80px;
     -fx-background-color: transparent;
-    -jfx-toggle-color: rgba(66.0, 133.0, 244.0, 0.29885056614875793);
+    -jfx-toggle-color: -papi-primary-alpha-020;
     -jfx-untoggle-color: transparent;
 }
 
 .toggle-icon1 .jfx-rippler {
-    -jfx-rippler-fill: rgba(66.0, 133.0, 244.0, 0.29885056614875793);
+    -jfx-rippler-fill: -papi-primary-alpha-030;
     -jfx-mask-type: CIRCLE;
 }
 
-.toggle-icon2, .toggle-icon3, .jfx-decorator-button {
+.toggle-icon2, .toggle-icon3 {
     -fx-pref-width: 50px;
     -fx-background-radius: 50px;
     -fx-pref-height: 50px;
     -fx-background-color: transparent;
 }
 
-/* unused */
 .toggle-icon2 .icon {
-    -fx-fill: RED;
+    -fx-fill: -papi-error;
 }
 
 .toggle-icon2 .jfx-rippler {
-    -jfx-rippler-fill: RED;
+    -jfx-rippler-fill: -papi-error;
     -jfx-mask-type: CIRCLE;
 }
 
-/* unused */
 .toggle-icon3 {
     -fx-toggle-icon4-size: 35px;
     -fx-pref-width: -fx-toggle-icon4-size;
@@ -1273,21 +1293,20 @@
     -fx-min-height: -fx-toggle-icon4-size;
     -fx-background-radius: 50px;
     -fx-background-color: transparent;
-    -jfx-toggle-color: white;
+    -jfx-toggle-color: -papi-primary-alpha-030;
     -jfx-untoggle-color: transparent;
 }
 
 .toggle-icon3 .icon {
-    -fx-fill: rgb(204.0, 204.0, 51.0);
+    -fx-fill: -papi-text;
     -fx-padding: 10.0;
 }
 
 .toggle-icon3 .jfx-rippler {
-    -jfx-rippler-fill: white;
+    -jfx-rippler-fill: -papi-primary-alpha-040;
     -jfx-mask-type: CIRCLE;
 }
 
-/* used */
 .toggle-icon4 {
     -fx-toggle-icon4-size: 30px;
     -fx-pref-width: -fx-toggle-icon4-size;
@@ -1298,17 +1317,17 @@
     -fx-min-height: -fx-toggle-icon4-size;
     -fx-background-radius: 50px;
     -fx-background-color: transparent;
-    -jfx-toggle-color: -monet-primary;
+    -jfx-toggle-color: -papi-primary-alpha-030;
     -jfx-untoggle-color: transparent;
 }
 
 .toggle-icon4 .icon {
-    -fx-fill: rgb(204.0, 204.0, 51.0);
+    -fx-fill: #FFFFFF;
     -fx-padding: 10.0;
 }
 
 .toggle-icon4 .jfx-rippler {
-    -jfx-rippler-fill: -monet-primary;
+    -jfx-rippler-fill: -papi-primary-alpha-040;
     -jfx-mask-type: CIRCLE;
 }
 
@@ -1320,41 +1339,44 @@
     -fx-pref-height: -fx-toggle-icon-tiny-size;
     -fx-max-height: -fx-toggle-icon-tiny-size;
     -fx-min-height: -fx-toggle-icon-tiny-size;
-    -fx-padding: 0;
     -fx-background-radius: 25px;
     -fx-background-color: transparent;
-    -jfx-toggle-color: -monet-primary;
+    -jfx-toggle-color: -papi-primary-alpha-030;
     -jfx-untoggle-color: transparent;
 }
 
 .toggle-icon-tiny .icon {
-    -fx-fill: rgb(204.0, 204.0, 51.0);
-    -fx-padding: 0;
-}
-
-.toggle-icon-tiny:overridden .svg {
-    -fx-fill: -monet-primary;
+    -fx-fill: #FFFFFF;
+    -fx-padding: 5.0;
 }
 
 .toggle-icon-tiny .jfx-rippler {
-    -jfx-rippler-fill: -monet-primary;
+    -jfx-rippler-fill: -papi-primary-alpha-040;
     -jfx-mask-type: CIRCLE;
 }
 
 .announcement-close-button {
     -fx-announcement-close-button-size: 20px;
-    -fx-pref-width: -fx-announcement-close-button-size;
-    -fx-max-width: -fx-announcement-close-button-size;
-    -fx-min-width: -fx-announcement-close-button-size;
-    -fx-pref-height: -fx-announcement-close-button-size;
-    -fx-max-height: -fx-announcement-close-button-size;
-    -fx-min-height: -fx-announcement-close-button-size;
+    -fx-pref-width: 24px;
+    -fx-max-width: 24px;
+    -fx-min-width: 24px;
+    -fx-pref-height: 24px;
+    -fx-max-height: 24px;
+    -fx-min-height: 24px;
     -fx-background-radius: 50px;
     -fx-background-color: transparent;
+    -fx-cursor: hand;
+    -fx-padding: 2px;
+    -fx-opacity: 1;
+}
+
+.announcement-close-button:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.1);
+    -fx-opacity: 1;
 }
 
 .announcement-close-button .jfx-rippler {
-    -jfx-rippler-fill: -monet-primary;
+    -jfx-rippler-fill: -papi-primary-alpha-040;
     -jfx-mask-type: CIRCLE;
 }
 
@@ -1362,69 +1384,29 @@
     -fx-background-color: null;
 }
 
-/*******************************************************************************
-*                                                                              *
-* Log Window                                                                   *
-*                                                                              *
-*******************************************************************************/
+/* === LOG WINDOW - OSCURO === */
+.log-toggle:selected {
+    -fx-background-color: transparent;
+    -fx-border: 1px;
+    -fx-border-color: -papi-primary;
+    -fx-text-fill: -papi-primary;
+}
 
 .log-toggle {
+    -fx-background-color: transparent;
     -fx-border: 1px;
-    -fx-background-insets: 0;
-    -fx-border-color: -fixed-log-toggle-unselected;
-    -fx-text-fill: -fixed-log-toggle-unselected;
-}
-
-.log-toggle:selected {
-    -fx-border: 1px;
-    -fx-border-color: -fixed-log-toggle-selected;
-    -fx-text-fill: -fixed-log-toggle-selected;
-}
-
-.log-toggle.fatal {
-    -fx-background-color: -fixed-log-fatal;
-}
-
-.log-toggle.error {
-    -fx-background-color: -fixed-log-error;
-}
-
-.log-toggle.warn {
-    -fx-background-color: -fixed-log-warn;
-}
-
-.log-toggle.info {
-    -fx-background-color: -fixed-log-info;
-}
-
-.log-toggle.debug {
-    -fx-background-color: -fixed-log-debug;
-}
-
-.log-toggle.trace {
-    -fx-background-color: -fixed-log-trace;
-}
-
-.log-window-list-cell:selected {
-    -fx-background-color: -fixed-log-selected;
-}
-
-.log-window {
-    -fx-background-color: -monet-surface-container;
+    -fx-border-color: rgba(255, 255, 255, 0.3);
+    -fx-text-fill: rgba(255, 255, 255, 0.7);
 }
 
 .log-window .scroll-bar .thumb {
-    -fx-fill: -monet-surface-tint;
-}
-
-.log-window .jfx-button {
-    -fx-text-fill: -monet-on-surface;
+    -fx-fill: rgba(255, 255, 255, 0.3);
 }
 
 .log-window-list-cell {
-    -fx-text-fill: -fixed-log-text-fill;
+    -fx-text-fill: rgba(255, 255, 255, 0.85);
     -fx-border-width: 0 0 1 0;
-    -fx-border-color: -monet-outline-variant;
+    -fx-border-color: rgba(255, 255, 255, 0.1);
 }
 
 .log-window-list-cell:empty {
@@ -1432,347 +1414,212 @@
 }
 
 .log-window-list-cell:fatal {
-    -fx-text-fill: -fixed-log-text-fill;
-    -fx-background-color: -fixed-log-fatal;
+    -fx-background-color: rgba(200, 80, 80, 0.3);
 }
 
 .log-window-list-cell:error {
-    -fx-text-fill: -fixed-log-text-fill;
-    -fx-background-color: -fixed-log-error;
+    -fx-background-color: rgba(200, 80, 80, 0.2);
 }
 
 .log-window-list-cell:warn {
-    -fx-text-fill: -fixed-log-text-fill;
-    -fx-background-color: -fixed-log-warn;
+    -fx-background-color: rgba(200, 180, 80, 0.2);
 }
 
 .log-window-list-cell:info {
-    -fx-text-fill: -fixed-log-text-fill;
-    -fx-background-color: -fixed-log-info;
-}
-
-.log-window-list-cell {
-    -fx-background-color: -fixed-log-info;
+    -fx-background-color: rgba(15, 15, 18, 0.4);
 }
 
 .log-window-list-cell:debug {
-    -fx-text-fill: -fixed-log-text-fill;
-    -fx-background-color: -fixed-log-debug;
+    -fx-background-color: rgba(15, 15, 18, 0.3);
 }
 
 .log-window-list-cell:trace {
-    -fx-text-fill: -fixed-log-text-fill;
-    -fx-background-color: -fixed-log-trace;
+    -fx-background-color: rgba(15, 15, 18, 0.25);
 }
 
 .log-window-list-cell:selected {
-    -fx-text-fill: -fixed-log-text-fill;
-    -fx-background-color: -fixed-log-selected;
+    -fx-background-color: -papi-primary-alpha-020;
 }
 
-/*******************************************************************************
-*                                                                              *
-* JFX Spinner                                                                  *
-*                                                                              *
-*******************************************************************************/
+/* === JFX SPINNER - OSCURO === */
+.jfx-spinner > .arc {
+    -fx-stroke-width: 3.0;
+    -fx-fill: transparent;
+    -fx-stroke: -papi-primary;
+}
 
-.jfx-spinner .arc {
-    -fx-stroke: -monet-primary-container;
+.first-spinner {
+    -jfx-radius: 20;
+}
+
+.first-spinner > .arc {
+    -fx-stroke-width: 5.0;
 }
 
 .small-spinner {
-    -jfx-radius: 9;
+    -jfx-radius: 10;
 }
 
-.small-spinner .arc {
+.small-spinner > .arc {
     -fx-stroke-width: 3.0;
 }
 
 .small-spinner-pane .jfx-spinner {
-    -jfx-radius: 9;
+    -jfx-radius: 10;
 }
 
-.spinner-pane .spinner-pane-content {
-    -fx-padding: 10px;
-    -fx-spacing: 10px;
+.small-spinner-pane .jfx-spinner > .arc {
+    -fx-stroke-width: 3.0;
 }
 
-/*******************************************************************************
-*                                                                              *
-* JFX Combo Box                                                                *
-*                                                                              *
-*******************************************************************************/
+.large-spinner-pane .jfx-spinner {
+    -jfx-radius: 20;
+}
 
+.large-spinner-pane .jfx-spinner {
+    -fx-stroke-width: 5.0;
+}
+
+.second-spinner {
+    -jfx-radius: 30;
+}
+
+.second-spinner > .arc {
+    -fx-stroke-width: 5.0;
+}
+
+.third-spinner {
+    -jfx-radius: 40;
+}
+
+.third-spinner > .arc {
+    -fx-stroke-width: 5.0;
+}
+
+.fourth-spinner {
+    -jfx-radius: 50;
+}
+
+.fourth-spinner > .arc {
+    -fx-stroke-width: 5.0;
+}
+
+.fifth-spinner {
+    -jfx-radius: 60;
+}
+
+.fifth-spinner > .arc {
+    -fx-stroke-width: 5.0;
+}
+
+.sixth-spinner {
+    -jfx-radius: 70;
+}
+
+.sixth-spinner > .arc {
+    -fx-stroke-width: 5.0;
+}
+
+.seventh-spinner {
+    -jfx-radius: 80;
+}
+
+.seventh-spinner > .arc {
+    -fx-stroke-width: 5.0;
+}
+
+/* === JFX COMBO BOX - OSCURO === */
 .jfx-combo-box {
-    -jfx-focus-color: transparent;
+    -jfx-focus-color: -papi-primary;
     -jfx-unfocus-color: transparent;
-    -fx-background-color: -monet-surface-container-highest;
+    -fx-background-color: rgba(15, 15, 18, 0.6);
+    -fx-background-radius: 12px;
     -fx-padding: 4;
     -fx-max-width: 1000000000;
-}
-
-.jfx-combo-box .arrow {
-    -fx-background-color: -monet-on-surface-variant;
-    -fx-shape: "M12 15 7 10H17L12 15Z";
-}
-
-.jfx-combo-box .text {
-    -fx-fill: -monet-on-surface;
-}
-
-.jfx-combo-box .text-field {
-    -fx-text-fill: -monet-on-surface;
-}
-
-.combo-box-popup .list-view {
-    -fx-background-color: -monet-surface-container;
-}
-
-.combo-box-popup .list-view .jfx-list-cell {
-    -fx-background-color: -monet-surface-container;
-    -fx-text-fill: -monet-on-surface;
-    -fx-cursor: hand;
-    -fx-background-insets: 0.0;
-}
-
-.combo-box-popup .list-view .list-cell:odd:selected > .jfx-rippler > StackPane,
-.combo-box-popup .list-view .list-cell:even:selected > .jfx-rippler > StackPane {
-    -fx-background-color: -monet-secondary-container;
-    -fx-text-fill: -monet-on-secondary-container;
-}
-
-.combo-box-popup .list-view .list-cell:hover > .jfx-rippler > StackPane {
-    -fx-background-color: -monet-secondary-container-transparent-50;
+    -fx-text-fill: #FFFFFF;
+    -fx-border-color: rgba(255, 255, 255, 0.12);
+    -fx-border-width: 1px;
+    -fx-border-radius: 12px;
 }
 
 .jfx-combo-box-warning {
-    -jfx-focus-color: #D34336;
-    -jfx-unfocus-color: #D34336;
+    -jfx-focus-color: -papi-error;
+    -jfx-unfocus-color: -papi-error;
 }
 
 .jfx-combo-box-warning .text {
-    -fx-fill: #D34336;
+    -fx-fill: -papi-error;
 }
 
-/*.combo-box-popup .list-view .jfx-list-cell .jfx-rippler {*/
-/*    -jfx-rippler-fill: -monet-primary-container;*/
-/*}*/
-
-/*******************************************************************************
-*                                                                              *
-* JFX Color Picker                                                             *
-*                                                                              *
-*******************************************************************************/
-
-.jfx-color-picker:armed,
-.jfx-color-picker:hover,
-.jfx-color-picker:focused,
-.jfx-color-picker {
-    -fx-background-color: TRANSPARENT, TRANSPARENT, TRANSPARENT, TRANSPARENT;
-    -fx-background-radius: 3px;
-    -fx-background-insets: 0px;
-    -fx-min-height: 25px;
+.combo-box-popup .list-view .jfx-list-cell {
+    -fx-background-insets: 0.0;
 }
 
-.color-palette-region {
+.combo-box-popup .list-view .jfx-list-cell .jfx-rippler {
+    -jfx-rippler-fill: -papi-primary-alpha-035;
 }
 
-.color-palette-region .jfx-button {
-    -fx-text-fill: -monet-on-surface;
-}
-
-.color-palette {
-    -fx-background-color: -monet-surface;
-}
-
-.custom-color-dialog .jfx-tab-pane {
-    -fx-background-color: -monet-surface;
-}
-
-.custom-color-dialog .custom-color-field {
-    -jfx-unfocus-color: -monet-on-surface;
-    -fx-background-color: TRANSPARENT;
-    -fx-font-weight: BOLD;
-    -fx-alignment: top-left;
-    -fx-max-width: 300;
-}
-
-.custom-color-dialog .tab .tab-label {
-    -fx-text-fill: -monet-on-surface;
-}
-
-.custom-color-dialog .tab .jfx-rippler {
-    -jfx-rippler-fill: -monet-on-surface;
-}
-
-.custom-color-dialog .tab-selected-line {
-    -fx-background-color: -monet-on-surface;
-}
-
-.custom-color-dialog .jfx-color-dialog-actions {
-    -fx-background-color: -monet-surface;
-    -fx-padding: 0.0 10.0 5.0 0.0;
-    -fx-alignment: center-right;
-}
-
-.custom-color-dialog .jfx-color-dialog-accept {
-    -fx-padding: 0.7em 0.8em;
-}
-
-.custom-color-dialog .jfx-color-dialog-cancel {
-    -fx-text-fill: -monet-on-surface-variant;
-    -fx-padding: 0.7em 0.8em;
-}
-
-/*******************************************************************************
- *                                                                             *
- * Table View                                                                  *
- *                                                                             *
- ******************************************************************************/
-
-/* WE DEFINITELY NEED JFX TABLE-VIEW */
-
-.table-view {
-    -fx-padding: 3;
-    -fx-background-color: -monet-surface-container-low;
-}
-
-.table-view,
-.table-view .column-header,
-.table-view .filler,
-.table-view .column-header-background,
-.table-row-cell {
-    -fx-background-radius: 6;
-    -fx-border-radius: 6;
-}
-
-.table-view .column-header,
-.table-view .filler {
-    -fx-background-color: transparent;
-}
-
-.table-view .column-header-background {
-    -fx-background-color: -monet-surface-container-highest;
-}
-
-.table-row-cell {
-    -fx-background-color: -monet-surface-container;
-    -fx-table-cell-border-color: -monet-surface-container-lowest;
-}
-
-.table-row-cell:odd {
-    -fx-background-color: -monet-surface-container-high;
-}
-
-.table-cell {
-    -fx-background-color: transparent;
-    -fx-text-fill: -monet-on-surface;
-}
-
-.table-view > .virtual-flow > .clipped-container > .sheet > .table-row-cell:filled:selected {
-    -fx-background-color: -monet-secondary-container;
-}
-
-.table-view > .virtual-flow > .scroll-bar {
-    -fx-skin: "org.jackhuang.hmcl.ui.construct.FloatScrollBarSkin";
-}
-
-.table-view > .virtual-flow > .scroll-bar .track {
-    -fx-fill: transparent;
-}
-
-/*******************************************************************************
- *                                                                             *
- * JFX Tree View                                                               *
- *                                                                             *
- ******************************************************************************/
-
-.tree-view {
-    -fx-padding: 5;
-    -fx-background-radius: 6;
-    -fx-background-color: -monet-surface-container-low;
-    -fx-border-radius: 6;
-}
-
-.tree-cell {
-    -fx-padding: 5;
-    -fx-background-radius: 6;
-    -fx-background-color: transparent;
-    -fx-text-fill: -monet-on-surface;
-    -fx-border-radius: 6;
-}
-
-.tree-cell:focused {
-    -fx-background-color: -monet-secondary-container;
-}
-
-.tree-cell .arrow {
-    -fx-background-color: -monet-on-surface;
-}
-
-.tree-cell .jfx-rippler {
-    -jfx-rippler-disabled: true;
-}
-
-.tree-view > .virtual-flow > .scroll-bar {
-    -fx-skin: "org.jackhuang.hmcl.ui.construct.FloatScrollBarSkin";
-}
-
-.tree-view > .virtual-flow > .scroll-bar .track {
-    -fx-fill: transparent;
-}
-
-/*******************************************************************************
-*                                                                              *
-* JFX Decorator                                                                *
-*                                                                              *
-*******************************************************************************/
-
+/* === JFX DECORATOR - OSCURO === */
 .jfx-decorator {
-    -fx-decorator-color: -monet-primary-container;
+    -fx-decorator-color: -papi-primary;
 }
 
 .jfx-decorator-drawer {
-    -fx-background-color: rgba(244, 244, 244, 0.5);
+    -fx-background-color: -papi-overlay;
 }
 
 .jfx-decorator-title {
+    -fx-text-fill: #FFFFFF;
     -fx-font-size: 14;
 }
 
+.jfx-decorator-title:transparent {
+    -fx-text-fill: #FFFFFF;
+}
+
+.jfx-decorator-tab .tab-container .tab-label {
+    -fx-text-fill: rgba(255, 255, 255, 0.5);
+    -fx-font-size: 14;
+}
+
+.jfx-decorator-tab .tab-container:selected .tab-label {
+    -fx-text-fill: -papi-primary;
+    -fx-font-weight: BOLD;
+}
+
+/* === WINDOW & BACKGROUNDS - OSCUROS === */
 .window {
     -fx-background-color: transparent;
     -fx-padding: 8;
 }
 
 .debug-border {
-    -fx-border-color: red;
+    -fx-border-color: -papi-error;
     -fx-border-width: 1;
 }
 
 .content-background {
-    -fx-background-color: -monet-surface-transparent-50;
+    -fx-background-color: -papi-surface;
 }
 
 .gray-background {
-    -fx-background-color: -monet-surface-transparent-50;
+    -fx-background-color: linear-gradient(to right, rgba(5,5,5,0.90) 0%, rgba(10,10,10,0.82) 100%);
 }
 
-/*******************************************************************************
- *                                                                             *
- * Scroll Bar			                                                       *
- *                                                                             *
- ******************************************************************************/
+.white-background {
+    -fx-background-color: -papi-bg;
+}
 
+/* === SCROLL BAR - OSCURO === */
 .scroll-bar:vertical > .track-background, .scroll-bar:horizontal > .track-background {
-    -fx-background-color: #F1F1F1;
+    -fx-background-color: rgba(15, 15, 18, 0.4);
     -fx-background-insets: 0.0;
 }
 
 .scroll-bar:vertical .thumb, .scroll-bar:horizontal .thumb {
-    -fx-background-color: #BCBCBC;
+    -fx-background-color: -papi-primary-alpha-040;
     -fx-background-insets: 0.0;
-    -fx-background-radius: 1.0;
+    -fx-background-radius: 8.0;
 }
 
 .scroll-bar > .increment-button, .scroll-bar > .decrement-button {
@@ -1784,7 +1631,7 @@
 }
 
 .scroll-bar > .increment-button > .increment-arrow, .scroll-bar > .decrement-button > .decrement-arrow {
-    -fx-background-color: rgb(150.0, 150.0, 150.0);
+    -fx-background-color: rgba(255, 255, 255, 0.5);
 }
 
 .scroll-bar > .increment-button > .increment-arrow {
@@ -1795,22 +1642,9 @@
     -fx-shape: "M298 598l214-214 214 214h-428z";
 }
 
-.jfx-combo-box .scroll-bar {
-    -fx-skin: "org.jackhuang.hmcl.ui.construct.FloatScrollBarSkin";
-}
-
-.jfx-combo-box .scroll-bar .track {
-    -fx-fill: transparent;
-}
-
-/*******************************************************************************
- *                                                                             *
- * Scroll Pane			                                                       *
- *                                                                             *
- ******************************************************************************/
-
+/* === SCROLL PANE - OSCURO === */
 .scroll-pane {
-    -fx-background-color: null;
+    -fx-background-color: -papi-bg;
     -fx-background-insets: 0;
     -fx-padding: 0;
     -fx-snap-to-pixel: false;
@@ -1825,7 +1659,7 @@
 }
 
 .scroll-pane > .viewport {
-    -fx-background-color: null;
+    -fx-background-color: -papi-bg;
 }
 
 .scroll-pane .scroll-bar {
@@ -1836,35 +1670,35 @@
     -fx-fill: transparent;
 }
 
-/*******************************************************************************
-*                                                                              *
-* Error Facade                                                                 *
-*                                                                              *
-*******************************************************************************/
+/* === GRAY-BACKGROUND on ScrollPane (override .scroll-pane default) === */
+.scroll-pane.gray-background {
+    -fx-background-color: linear-gradient(to right, rgba(5,5,5,0.90) 0%, rgba(10,10,10,0.82) 100%);
+}
 
+/* === ERROR FACADE === */
 .error-label {
-    -fx-text-fill: -monet-error;
+    -fx-text-fill: -papi-error;
     -fx-font-size: 0.75em;
     -fx-font-weight: bold;
 }
 
 .error-icon {
-    -fx-fill: -monet-error;
+    -fx-fill: -papi-error;
     -fx-font-size: 1.0em;
 }
 
 .jfx-text-field:error, .jfx-password-field:error, .jfx-text-area:error, .jfx-combo-box:error {
-    -jfx-focus-color: -monet-error;
-    -jfx-unfocus-color: -monet-error;
+    -jfx-focus-color: -papi-error;
+    -jfx-unfocus-color: -papi-error;
 }
 
 .jfx-text-field .error-label, .jfx-password-field .error-label, .jfx-text-area .error-label {
-    -fx-text-fill: -monet-error;
+    -fx-text-fill: -papi-error;
     -fx-font-size: 0.75em;
 }
 
 .jfx-text-field .error-icon, .jfx-password-field .error-icon, .jfx-text-area .error-icon {
-    -fx-fill: -monet-error;
+    -fx-fill: -papi-error;
     -fx-font-size: 1.0em;
 }
 
@@ -1872,18 +1706,13 @@
     -fx-pref-width: 100%;
 }
 
-/*******************************************************************************
-*                                                                              *
-* HTML Renderer                                                                *
-*                                                                              *
-*******************************************************************************/
-
+/* === HTML RENDERER === */
 .html {
     -fx-font-size: 16;
 }
 
 .html-hyperlink {
-    -fx-fill: -monet-primary;
+    -fx-fill: -papi-text;
 }
 
 .html-h1 {
@@ -1906,84 +1735,637 @@
     -fx-font-style: italic;
 }
 
-/*******************************************************************************
- *                                                                             *
- * Tooltip                                                                     *
- *                                                                             *
- ******************************************************************************/
-
-.tooltip {
-    -fx-text-fill: -monet-inverse-on-surface;
-    -fx-background-color: -monet-inverse-surface;
+/* === ColorPicker DARK THEME === */
+.color-picker {
+    -fx-color-rect-width: 18px;
+    -fx-color-rect-height: 18px;
 }
 
-.tooltip .text {
-    -fx-fill: -monet-inverse-on-surface;
+.color-picker .arrow-button {
+    -fx-background-color: -papi-surface;
+    -fx-background-radius: 0 8 8 0;
 }
 
-/*******************************************************************************
- *                                                                             *
- * Line Component                                                              *
- *                                                                             *
- ******************************************************************************/
-
-.line-component .line-component-container {
-    -fx-padding: 10 16 10 16;
+.color-picker .arrow {
+    -fx-background-color: -papi-text-secondary;
 }
 
-.line-component .subtitle-label {
-    -fx-text-fill: -monet-on-surface-variant;
+.color-picker .color-picker-label {
+    -fx-background-color: -papi-surface;
+    -fx-background-radius: 8 0 0 8;
+    -fx-text-fill: -papi-text-secondary;
+    -fx-padding: 4 8 4 8;
 }
 
-.line-component.no-padding .line-component-container {
+.color-picker .color-picker-label .picker-color {
+    -fx-padding: 0 6 0 0;
+}
+
+.color-picker .color-picker-label .picker-color .picker-color-rect {
+    -fx-stroke: rgba(255,255,255,0.15);
+}
+
+.color-palette {
+    -fx-background-color: -papi-surface-alt;
+    -fx-background-radius: 12;
+    -fx-background-insets: 2;
+    -fx-padding: 12;
+    -fx-spacing: 8;
+    -fx-effect: dropshadow(gaussian, -papi-shadow, 20, 0, 0, 8);
+    -fx-border-color: -papi-border-subtle;
+    -fx-border-radius: 12;
+    -fx-border-width: 1;
+}
+
+.color-palette .color-picker-grid {
+    -fx-hgap: 2;
+    -fx-vgap: 2;
+    -fx-padding: 4;
+}
+
+.color-palette .color-rect {
+    -fx-stroke: rgba(255,255,255,0.08);
+    -fx-stroke-type: inside;
+    -fx-cursor: hand;
+    -fx-arc-width: 2;
+    -fx-arc-height: 2;
+}
+
+.color-palette .color-rect:hover {
+    -fx-stroke: -papi-primary;
+    -fx-stroke-width: 1.5;
+}
+
+.color-palette .separator {
+    -fx-padding: 6 0;
+}
+
+.color-palette .separator .line {
+    -fx-background-color: rgba(255,255,255,0.06);
+}
+
+.color-palette .hyperlink {
+    -fx-padding: 6 8;
+    -fx-text-fill: -papi-primary;
+    -fx-border-color: transparent;
+    -fx-font-size: 12px;
+}
+
+.color-palette .hyperlink:hover {
+    -fx-text-fill: -papi-primary-lighter;
+}
+
+.color-palette .hyperlink:visited {
+    -fx-text-fill: -papi-primary;
+}
+
+/* Custom Color Dialog - DARK THEME COMPLETE */
+.custom-color-dialog {
+    -fx-background-color: -papi-surface-alt !important;
+    -fx-padding: 16;
+    -fx-spacing: 10;
+    -fx-border-color: -papi-border-subtle;
+    -fx-border-width: 0;
+    -fx-effect: dropshadow(gaussian, -papi-shadow, 32, 0, 0, 12);
+    -fx-background-insets: 0;
+}
+
+.custom-color-dialog .controls-pane {
+    -fx-background-color: transparent;
+}
+
+.custom-color-dialog #settings-pane {
+    -fx-background-color: transparent;
+}
+
+.custom-color-dialog .customcolor-controls-background {
+    -fx-background-color: transparent;
+}
+
+.custom-color-dialog .color-rect-pane {
     -fx-padding: 0;
+    -fx-background-color: transparent;
 }
 
-.line-component:large-title .title-label {
-    -fx-font-size: 15px;
+.custom-color-dialog .color-rect-pane .color-rect-border {
+    -fx-border-color: rgba(255,255,255,0.1);
+    -fx-border-radius: 6;
+    -fx-background-color: transparent;
 }
 
-.line-button .svg:disabled {
+.custom-color-dialog .color-rect-pane .color-rect-outer-border {
+    -fx-padding: 0;
+    -fx-border-color: transparent;
+}
+
+.custom-color-dialog .controls-row {
+    -fx-spacing: 10;
+    -fx-padding: 8 0;
+    -fx-background-color: transparent;
+}
+
+.custom-color-dialog GridPane {
+    -fx-background-color: transparent;
+    -fx-hgap: 6;
+    -fx-vgap: 4;
+}
+
+.custom-color-dialog VBox,
+.custom-color-dialog HBox {
+    -fx-background-color: transparent;
+}
+
+.custom-color-dialog Label,
+.custom-color-dialog .label {
+    -fx-text-fill: -papi-text-secondary !important;
+    -fx-font-size: 12px;
+    -fx-background-color: transparent;
+}
+
+.custom-color-dialog TextField,
+.custom-color-dialog .text-field {
+    -fx-background-color: -papi-surface !important;
+    -fx-background-radius: 6;
+    -fx-border-color: -papi-border-subtle;
+    -fx-border-radius: 6;
+    -fx-border-width: 1;
+    -fx-text-fill: -papi-text-secondary !important;
+    -fx-prompt-text-fill: -papi-text-tertiary !important;
+    -fx-padding: 4 8;
+    -fx-min-height: 26;
+}
+
+.custom-color-dialog TextField:focused,
+.custom-color-dialog .text-field:focused {
+    -fx-border-color: -papi-primary !important;
+}
+
+.custom-color-dialog Slider,
+.custom-color-dialog .slider {
+    -fx-padding: 2 0;
+    -fx-background-color: transparent;
+}
+
+.custom-color-dialog .slider .track {
+    -fx-background-color: -papi-surface !important;
+    -fx-background-radius: 4;
+    -fx-pref-height: 6;
+    -fx-background-insets: 0;
+}
+
+.custom-color-dialog .slider .thumb {
+    -fx-background-color: -papi-primary !important;
+    -fx-background-radius: 10;
+    -fx-pref-height: 16;
+    -fx-pref-width: 16;
+}
+
+.custom-color-dialog .slider:focused .thumb {
+    -fx-effect: dropshadow(gaussian, -papi-primary, 8, 0, 0, 0);
     -fx-opacity: 0.4;
 }
 
-.line-button .trailing-label {
-    -fx-text-fill: -monet-on-surface-variant;
+.custom-color-dialog .slider .colored-track {
+    -fx-background-color: -papi-primary !important;
 }
 
-.line-button .trailing-icon .svg {
-    -fx-fill: -monet-on-surface-variant;
-    -fx-opacity: 1;
+.custom-color-dialog .slider .slider-value {
+    -fx-text-fill: -papi-text-secondary !important;
 }
 
-.line-button .trailing-icon .svg:disabled {
-    -fx-opacity: 0.4;
+.custom-color-dialog Button,
+.custom-color-dialog .button {
+    -fx-background-color: -papi-surface !important;
+    -fx-background-radius: 8;
+    -fx-text-fill: -papi-text-secondary !important;
+    -fx-padding: 6 20;
+    -fx-border-color: -papi-border-subtle;
+    -fx-border-radius: 8;
+    -fx-border-width: 1;
+    -fx-cursor: hand;
 }
 
-.line-select-button .menu-container .title-label {
+.custom-color-dialog Button:hover,
+.custom-color-dialog .button:hover {
+    -fx-background-color: -papi-surface-alt !important;
+}
+
+.custom-color-dialog .button:default {
+    -fx-background-color: -papi-primary !important;
+    -fx-text-fill: #FFFFFF !important;
+    -fx-border-color: transparent;
+}
+
+.custom-color-dialog .button:default:hover {
+    -fx-background-color: -papi-primary-lighter !important;
+}
+
+.custom-color-dialog .toggle-button {
+    -fx-background-color: -papi-surface !important;
+    -fx-background-radius: 6;
+    -fx-text-fill: -papi-text-secondary !important;
+    -fx-border-color: -papi-border-subtle;
+    -fx-border-radius: 6;
+    -fx-border-width: 1;
+    -fx-padding: 4 14;
+}
+
+.custom-color-dialog .toggle-button:selected {
+    -fx-background-color: -papi-primary !important;
+    -fx-text-fill: #FFFFFF !important;
+    -fx-border-color: -papi-primary !important;
+}
+
+.custom-color-dialog .combo-box {
+    -fx-background-color: -papi-surface !important;
+    -fx-background-radius: 6;
+    -fx-border-color: -papi-border-subtle;
+    -fx-border-radius: 6;
+    -fx-text-fill: -papi-text-secondary !important;
+    -fx-padding: 2 6;
+}
+
+.custom-color-dialog .spinner {
+    -fx-background-color: -papi-surface !important;
+    -fx-background-radius: 6;
+    -fx-border-color: -papi-border-subtle;
+    -fx-border-radius: 6;
+}
+
+.custom-color-dialog .spinner .increment-arrow-button,
+.custom-color-dialog .spinner .decrement-arrow-button {
+    -fx-background-color: -papi-surface-alt !important;
+    -fx-border-color: transparent;
+}
+
+.custom-color-dialog .spinner .increment-arrow-button:hover,
+.custom-color-dialog .spinner .decrement-arrow-button:hover {
+    -fx-background-color: -papi-overlay !important;
+}
+
+.custom-color-dialog .spinner .increment-arrow,
+.custom-color-dialog .spinner .decrement-arrow {
+    -fx-background-color: -papi-text-secondary !important;
+}
+
+.custom-color-dialog .spinner .text-field {
+    -fx-background-color: transparent !important;
+    -fx-border-color: transparent !important;
+    -fx-text-fill: -papi-text-secondary !important;
+}
+
+.custom-color-dialog .color-input-field {
+    -fx-padding: 0 4;
+    -fx-background-color: transparent;
+}
+
+.custom-color-dialog .color-rect-pane .color-rect {
+    -fx-border-color: rgba(255,255,255,0.08);
+}
+
+.custom-color-dialog .color-rect-pane .color-bar {
+    -fx-border-color: rgba(255,255,255,0.08);
+}
+
+.custom-color-dialog .current-and-new-color {
+    -fx-background-color: transparent;
+}
+
+.custom-color-dialog .current-and-new-color GridPane {
+    -fx-background-color: transparent;
+}
+
+.custom-color-dialog .current-color-label,
+.custom-color-dialog .new-color-label {
+    -fx-text-fill: -papi-text-secondary !important;
+    -fx-font-size: 11px;
+}
+
+.custom-color-dialog .web-color-field {
+    -fx-background-color: -papi-surface !important;
+    -fx-background-radius: 6;
+    -fx-border-color: -papi-border-subtle;
+    -fx-border-radius: 6;
+    -fx-text-fill: -papi-text-secondary !important;
+}
+
+/* JFXColorPicker specific overrides */
+.jfx-color-picker {
+    -jfx-default-color: -papi-primary;
+    -fx-background-color: -papi-surface;
+    -fx-background-radius: 8;
+    -fx-border-color: rgba(255,255,255,0.06);
+    -fx-border-radius: 8;
+    -fx-padding: 4 8;
+    -fx-min-width: 80;
+    -fx-min-height: 30;
+}
+
+.jfx-color-picker .color-picker-label {
+    -fx-text-fill: -papi-text-secondary;
+}
+
+.jfx-color-picker .arrow-button {
+    -fx-background-color: transparent;
+}
+
+.jfx-color-picker .arrow {
+    -fx-background-color: -papi-text-secondary;
+}
+
+/* ============================================================
+   CONTAINER PAGE - Void Green dark theme
+   ============================================================ */
+
+.container-section-title {
+    -fx-text-fill: -papi-text-secondary;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+}
+
+.container-detail-label {
+    -fx-text-fill: -papi-text-tertiary;
+    -fx-font-size: 12px;
+}
+
+.container-content-row {
+    -fx-background-color: -papi-surface;
+    -fx-background-radius: 4;
+    -fx-padding: 6 8;
+}
+
+.container-chip {
+    -fx-background-color: -papi-surface;
+    -fx-background-radius: 4;
+    -fx-padding: 3 8;
+}
+
+.container-chip Label {
+    -fx-text-fill: -papi-text-secondary;
+    -fx-font-size: 11px;
+}
+
+.container-card {
+    -fx-background-color: -papi-surface;
+    -fx-background-radius: 10;
+    -fx-padding: 0;
+    -fx-border-color: -papi-border-subtle;
+    -fx-border-width: 1.5;
+    -fx-border-radius: 10;
+}
+
+.container-card-selected {
+    -fx-background-color: -papi-surface;
+    -fx-border-color: -papi-primary;
+    -fx-border-width: 2;
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+}
+
+.container-empty-label {
+    -fx-text-fill: -papi-text-tertiary;
+    -fx-font-size: 14px;
+}
+
+.container-empty-small {
+    -fx-text-fill: -papi-text-tertiary;
+    -fx-font-size: 12px;
+}
+
+.container-scroll-pane {
+    -fx-background: transparent;
+    -fx-background-color: transparent;
+}
+.container-scroll-pane > .viewport {
+    -fx-background-color: transparent;
+}
+
+.container-filter-btn {
+    -fx-background-color: -papi-surface;
+    -fx-text-fill: -papi-text-tertiary;
+    -fx-font-size: 11px;
+    -fx-font-style: italic;
+    -fx-background-radius: 4;
+    -fx-padding: 2 6;
+    -fx-cursor: hand;
+}
+
+.container-search-field {
+    -fx-background-color: -papi-surface;
+    -fx-text-fill: -papi-text-secondary;
+    -fx-font-size: 11px;
+    -fx-padding: 2 6;
+    -fx-prompt-text-fill: -papi-text-tertiary;
+}
+
+.container-name-label {
+    -fx-text-fill: -papi-text;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+}
+
+.container-version-label {
+    -fx-text-fill: -papi-text-tertiary;
+    -fx-font-size: 11px;
+}
+
+.container-count-label {
+    -fx-text-fill: -papi-text;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+}
+
+.container-desc-label {
+    -fx-text-fill: -papi-text-tertiary;
+    -fx-font-size: 10px;
+}
+
+.container-date-label {
+    -fx-text-fill: -papi-text-tertiary;
+    -fx-font-size: 10px;
+}
+
+.container-stat-cell {
+    -fx-background-color: transparent;
+    -fx-padding: 8 12;
+}
+
+.container-input-field {
+    -fx-background-color: -papi-surface !important;
+    -fx-text-fill: -papi-text-secondary !important;
+    -fx-prompt-text-fill: -papi-text-tertiary !important;
+    -fx-control-inner-background: -papi-surface !important;
+    -fx-font-size: 13px;
+    -fx-padding: 4 8;
+}
+
+.container-input-field:focused {
+    -fx-background-color: -papi-surface !important;
+    -fx-control-inner-background: -papi-surface !important;
+}
+
+.container-input-field .content {
+    -fx-background-color: -papi-surface !important;
+}
+
+.container-name-warning {
+    -fx-text-fill: -papi-error;
+    -fx-font-size: 11px;
+}
+
+/* Dialog styles used in container pages */
+.container-dialog-bg {
+    -fx-background-color: -papi-surface-alt;
+}
+
+.container-dialog-heading {
+    -fx-text-fill: -papi-text;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+}
+
+.container-dialog-item {
+    -fx-text-fill: -papi-error;
     -fx-font-size: 13px;
 }
 
-.line-select-button .menu-container .title-label {
-    -fx-text-fill: -monet-on-surface;
+.container-dialog-prompt {
+    -fx-text-fill: -papi-text-tertiary;
+    -fx-font-size: 12px;
 }
 
-.line-select-button .menu-container .subtitle-label {
-    -fx-text-fill: -monet-on-surface-variant;
+.container-launch-btn {
+    -fx-background-color: -papi-primary;
+    -fx-text-fill: #FFFFFF;
+    -fx-font-weight: bold;
+    -fx-background-radius: 4;
+    -fx-padding: 6 20;
+    -fx-font-size: 13px;
 }
 
-.line-select-button .menu-container:selected .title-label {
-    -fx-text-fill: -monet-primary;
+.container-launch-btn:disabled {
+    -fx-background-color: -papi-surface-alt;
+    -fx-opacity: 0.5;
 }
 
-.line-select-button .menu-container:selected .subtitle-label {
-    -fx-text-fill: -monet-primary-container;
+.container-open-btn {
+    -fx-background-color: -papi-primary;
+    -fx-text-fill: #FFFFFF;
+    -fx-font-weight: bold;
+    -fx-background-radius: 4;
+    -fx-padding: 6 20;
+    -fx-font-size: 13px;
 }
 
-.line-toggle-button .jfx-toggle-button {
-    -fx-padding: 0;
+.container-open-btn:disabled {
+    -fx-background-color: -papi-surface-alt;
+    -fx-opacity: 0.5;
 }
 
-.update-pane:active .subtitle-label {
-    -fx-text-fill: -monet-tertiary;
+.container-delete-btn {
+    -fx-background-color: -papi-error;
+    -fx-text-fill: -papi-text;
+    -fx-font-weight: bold;
+    -fx-background-radius: 4;
+    -fx-padding: 6 20;
+    -fx-font-size: 13px;
+}
+
+.container-delete-btn:disabled {
+    -fx-background-color: -papi-surface-alt;
+    -fx-opacity: 0.5;
+}
+
+.container-delete-icon-btn {
+    -fx-background-color: -papi-error;
+    -fx-background-radius: 4;
+    -fx-padding: 4 6;
+    -fx-cursor: hand;
+}
+
+.container-small-btn {
+    -fx-background-color: -papi-surface;
+    -fx-background-radius: 4;
+    -fx-padding: 2 10;
+    -fx-font-size: 11px;
+}
+
+.container-sort-btn {
+    -fx-background-color: -papi-surface;
+    -fx-background-radius: 4;
+    -fx-padding: 2 6;
+}
+
+.container-import-export-btn {
+    -fx-background-color: -papi-surface;
+    -fx-text-fill: -papi-primary;
+    -fx-background-radius: 4;
+    -fx-padding: 6 16;
+    -fx-font-size: 12px;
+}
+
+.container-broken-badge {
+    -fx-background-color: -papi-error;
+    -fx-text-fill: -papi-text;
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 50%;
+    -fx-min-width: 16px;
+    -fx-min-height: 16px;
+    -fx-max-width: 16px;
+    -fx-max-height: 16px;
+    -fx-alignment: center;
+}
+
+/* Neutralize hover green on container buttons — keep original bg */
+.container-filter-btn:hover {
+    -fx-background-color: -papi-surface;
+    -fx-effect: none;
+}
+
+.container-sort-btn:hover {
+    -fx-background-color: -papi-surface;
+    -fx-effect: none;
+}
+
+.container-small-btn:hover {
+    -fx-background-color: -papi-surface;
+}
+
+.container-delete-btn:hover {
+    -fx-background-color: -papi-error;
+}
+
+.container-delete-icon-btn:hover {
+    -fx-background-color: -papi-error;
+}
+
+.container-launch-btn:hover {
+    -fx-background-color: -papi-primary;
+}
+
+.container-open-btn:hover {
+    -fx-background-color: -papi-primary;
+}
+
+.container-import-export-btn:hover {
+    -fx-background-color: -papi-surface;
+}
+
+/* ═══════════════════════════════════════════════════════ */
+/* FORCE WHITE TEXT on all standard JavaFX text nodes     */
+/* Uses CLASS selectors only — NO type selectors          */
+/* Buttons (.button, .jfx-button) are NOT affected        */
+/* ═══════════════════════════════════════════════════════ */
+.label, .text, .title, .subtitle, .header,
+.text-input, .text-area, .tab-label,
+.list-cell, .list-cell .text,
+.hyperlink, .check-box, .radio-button, .toggle-button,
+.titled-pane .title, .accordion .title,
+.tooltip, .slider .axis,
+.progress-indicator, .progress-bar .bar,
+.combo-box .list-cell, .tree-cell, .tree-cell .text,
+.two-line-list-item .title, .two-line-list-item .subtitle,
+.dialog-pane .content {
+    -fx-text-fill: #FFFFFF !important;
 }

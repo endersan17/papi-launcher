@@ -20,20 +20,15 @@ package org.jackhuang.hmcl.mod;
 import org.jackhuang.hmcl.download.DefaultDependencyManager;
 import org.jackhuang.hmcl.task.Task;
 
+import java.io.File;
 import java.nio.charset.Charset;
-import java.nio.file.Path;
 import java.util.List;
-import java.util.Set;
 
 /**
  *
  * @author huangyuhui
  */
 public abstract class Modpack {
-
-    public static final Set<String> SUPPORTED_ICON_EXTS = Set.of("png", "jpg", "jpeg", "bmp", "gif", "webp", "apng");
-    public static final Set<String> SUPPORTED_ICON_NAMES = Set.of("icon.png", "icon.jpg", "icon.jpeg", "icon.bmp", "icon.gif", "icon.webp", "icon.apng");
-
     private String name;
     private String author;
     private String version;
@@ -119,7 +114,7 @@ public abstract class Modpack {
         return this;
     }
 
-    public abstract Task<?> getInstallTask(DefaultDependencyManager dependencyManager, Path zipFile, String name, String iconUrl);
+    public abstract Task<?> getInstallTask(DefaultDependencyManager dependencyManager, File zipFile, String name);
 
     public static boolean acceptFile(String path, List<String> blackList, List<String> whiteList) {
         if (path.isEmpty())

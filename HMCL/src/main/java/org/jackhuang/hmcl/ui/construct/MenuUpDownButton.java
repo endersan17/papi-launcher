@@ -29,6 +29,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.Skin;
 import javafx.scene.control.SkinBase;
 import javafx.scene.layout.HBox;
+import org.jackhuang.hmcl.setting.Theme;
 import org.jackhuang.hmcl.ui.FXUtils;
 import org.jackhuang.hmcl.ui.SVG;
 
@@ -38,7 +39,6 @@ public class MenuUpDownButton extends Control {
     private final StringProperty text = new SimpleStringProperty(this, "text");
 
     public MenuUpDownButton() {
-        this.getStyleClass().add("menu-up-down-button");
     }
 
     @Override
@@ -78,10 +78,11 @@ public class MenuUpDownButton extends Control {
             HBox content = new HBox(8);
             content.setAlignment(Pos.CENTER);
             Label label = new Label();
+            label.setStyle("-fx-text-fill: #FFFFFF;");
             label.textProperty().bind(control.text);
 
-            Node up = SVG.ARROW_DROP_UP.createIcon(16);
-            Node down = SVG.ARROW_DROP_DOWN.createIcon(16);
+            Node up = SVG.ARROW_DROP_UP.createIcon(Theme.blackFill(), 16);
+            Node down = SVG.ARROW_DROP_DOWN.createIcon(Theme.blackFill(), 16);
 
             JFXButton button = new JFXButton();
             button.setGraphic(content);

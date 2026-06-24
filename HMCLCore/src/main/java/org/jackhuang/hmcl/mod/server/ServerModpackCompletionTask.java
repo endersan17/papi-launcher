@@ -21,7 +21,7 @@ import com.google.gson.JsonParseException;
 import org.jackhuang.hmcl.download.DefaultDependencyManager;
 import org.jackhuang.hmcl.download.GameBuilder;
 import org.jackhuang.hmcl.game.DefaultGameRepository;
-import org.jackhuang.hmcl.mod.LocalAddonManager;
+import org.jackhuang.hmcl.mod.ModManager;
 import org.jackhuang.hmcl.mod.ModpackConfiguration;
 import org.jackhuang.hmcl.task.FileDownloadTask;
 import org.jackhuang.hmcl.task.GetTask;
@@ -30,6 +30,7 @@ import org.jackhuang.hmcl.util.DigestUtils;
 import org.jackhuang.hmcl.util.StringUtils;
 import org.jackhuang.hmcl.util.gson.JsonUtils;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -60,9 +61,9 @@ public class ServerModpackCompletionTask extends Task<Void> {
 
         if (manifest == null) {
             try {
-                Path manifestFile = repository.getModpackConfiguration(version);
-                if (Files.exists(manifestFile)) {
-                    this.manifest = JsonUtils.fromJsonFile(manifestFile, ModpackConfiguration.typeOf(ServerModpackManifest.class));
+                File manifestFile = repository.getModpackConfiguration(version);
+                if (manifestFile.exists()) {
+                    this.manifest = JsonUtils.fromJsonFile(manifestFile.toPath(), ModpackConfiguration.typeOf(ServerModpackManifest.class));
                 }
             } catch (Exception e) {
                 LOG.warning("Unable to read Server modpack manifest.json", e);
@@ -120,7 +121,7 @@ public class ServerModpackCompletionTask extends Task<Void> {
             dependencies.add(builder.buildAsync());
         }
 
-        Path rootPath = repository.getVersionRoot(version).toAbsolutePath().normalize();
+        Path rootPath = repository.getVersionRoot(version).toPath().toAbsolutePath().normalize();
         Map<String, ModpackConfiguration.FileInformation> files = manifest.getManifest().getFiles().stream()
                 .collect(Collectors.toMap(ModpackConfiguration.FileInformation::getPath,
                         Function.identity()));
@@ -128,7 +129,7 @@ public class ServerModpackCompletionTask extends Task<Void> {
         Set<String> remoteFiles = remoteManifest.getFiles().stream().map(ModpackConfiguration.FileInformation::getPath)
                 .collect(Collectors.toSet());
 
-        Path runDirectory = repository.getRunDirectory(version).toAbsolutePath().normalize();
+        Path runDirectory = repository.getRunDirectory(version).toPath().toAbsolutePath().normalize();
         Path modsDirectory = runDirectory.resolve("mods");
 
         int total = 0;
@@ -142,14 +143,10 @@ public class ServerModpackCompletionTask extends Task<Void> {
             }
 
             boolean download;
-
-            boolean isModDisabled = modsDirectory.equals(actualPath.getParent()) &&
-                    (Files.exists(actualPath.resolveSibling(fileName + LocalAddonManager.DISABLED_EXTENSION)) ||
-                            Files.exists(actualPath.resolveSibling(fileName + LocalAddonManager.OLD_EXTENSION)));
-
-            if (isModDisabled) {
-                download = false;
-            } else if (!files.containsKey(file.getPath())) {
+            if (!files.containsKey(file.getPath()) ||
+                    modsDirectory.equals(actualPath.getParent())
+                            && Files.notExists(actualPath.resolveSibling(fileName + ModManager.DISABLED_EXTENSION))
+                            && Files.notExists(actualPath.resolveSibling(fileName + ModManager.OLD_EXTENSION))) {
                 // If old modpack does not have this entry, download it
                 download = true;
             } else if (!Files.exists(actualPath)) {
@@ -192,7 +189,7 @@ public class ServerModpackCompletionTask extends Task<Void> {
     @Override
     public void postExecute() throws Exception {
         if (manifest == null || StringUtils.isBlank(manifest.getManifest().getFileApi())) return;
-        Path manifestFile = repository.getModpackConfiguration(version);
+        Path manifestFile = repository.getModpackConfiguration(version).toPath();
         Files.createDirectories(manifestFile.getParent());
         JsonUtils.writeToJsonFile(manifestFile, new ModpackConfiguration<>(remoteManifest, this.manifest.getType(), this.manifest.getName(), this.manifest.getVersion(), remoteManifest.getFiles()));
     }

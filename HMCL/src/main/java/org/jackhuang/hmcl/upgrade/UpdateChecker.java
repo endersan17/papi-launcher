@@ -23,19 +23,13 @@ import javafx.beans.binding.BooleanBinding;
 import javafx.beans.property.*;
 import javafx.beans.value.ObservableBooleanValue;
 import org.jackhuang.hmcl.Metadata;
-import org.jackhuang.hmcl.util.io.NetworkUtils;
 import org.jackhuang.hmcl.util.versioning.VersionNumber;
 
-import java.io.IOException;
-import java.util.LinkedHashMap;
-
-import static org.jackhuang.hmcl.setting.SettingsManager.settings;
-import static org.jackhuang.hmcl.util.Lang.*;
+import static org.jackhuang.hmcl.util.Lang.thread;
 import static org.jackhuang.hmcl.util.logging.Logger.LOG;
 
 public final class UpdateChecker {
-    private UpdateChecker() {
-    }
+    private UpdateChecker() {}
 
     private static final ObjectProperty<RemoteVersion> latestVersion = new SimpleObjectProperty<>();
     private static final BooleanBinding outdated = Bindings.createBooleanBinding(
@@ -43,20 +37,20 @@ public final class UpdateChecker {
                 RemoteVersion latest = latestVersion.get();
                 if (latest == null || isDevelopmentVersion(Metadata.VERSION)) {
                     return false;
-                } else if (latest.force()
+                } else if (latest.isForce()
                         || Metadata.isNightly()
-                        || latest.channel() == UpdateChannel.NIGHTLY
-                        || latest.channel() != UpdateChannel.getChannel()) {
-                    return !latest.version().equals(Metadata.VERSION);
+                        || latest.getChannel() == UpdateChannel.NIGHTLY
+                        || latest.getChannel() != UpdateChannel.getChannel()) {
+                    return !latest.getVersion().equals(Metadata.VERSION);
                 } else {
-                    return VersionNumber.compare(Metadata.VERSION, latest.version()) < 0;
+                    return VersionNumber.compare(Metadata.VERSION, latest.getVersion()) < 0;
                 }
             },
             latestVersion);
     private static final ReadOnlyBooleanWrapper checkingUpdate = new ReadOnlyBooleanWrapper(false);
 
     public static void init() {
-        requestCheckUpdate(UpdateChannel.getChannel(), settings().acceptPreviewUpdateProperty().get());
+        requestCheckUpdate(UpdateChannel.getChannel());
     }
 
     public static RemoteVersion getLatestVersion() {
@@ -83,17 +77,13 @@ public final class UpdateChecker {
         return checkingUpdate.getReadOnlyProperty();
     }
 
-    private static RemoteVersion checkUpdate(UpdateChannel channel, boolean preview) throws IOException {
-        if (!IntegrityChecker.DISABLE_SELF_INTEGRITY_CHECK && !IntegrityChecker.isSelfVerified()) {
-            throw new IOException("Self verification failed");
+    private static RemoteVersion checkUpdate(UpdateChannel channel) {
+        PapiRemoteVersion papiVersion = PapiUpdateChecker.checkForUpdate();
+        if (papiVersion == null) {
+            return null;
         }
-
-        var query = new LinkedHashMap<String, String>();
-        query.put("version", Metadata.VERSION);
-        query.put("channel", preview ? channel.channelName + "-preview" : channel.channelName);
-
-        String url = NetworkUtils.withQuery(Metadata.HMCL_UPDATE_URL, query);
-        return RemoteVersion.fetch(channel, preview, url);
+        return new RemoteVersion(channel, papiVersion.getVersion(), papiVersion.getDownloadUrl(),
+                RemoteVersion.Type.JAR, null, true);
     }
 
     private static boolean isDevelopmentVersion(String version) {
@@ -101,27 +91,22 @@ public final class UpdateChecker {
                 version.contains("SNAPSHOT"); // eg. 3.5.SNAPSHOT
     }
 
-    public static void requestCheckUpdate(UpdateChannel channel, boolean preview) {
+    public static void requestCheckUpdate(UpdateChannel channel) {
         Platform.runLater(() -> {
             if (isCheckingUpdate())
                 return;
             checkingUpdate.set(true);
 
             thread(() -> {
-                RemoteVersion result = null;
-                try {
-                    result = checkUpdate(channel, preview);
-                    LOG.info("Latest version (" + channel + ", preview=" + preview + ") is " + result);
-                } catch (Throwable e) {
-                    LOG.warning("Failed to check for update", e);
-                }
+                RemoteVersion result = checkUpdate(channel);
+                LOG.info("Latest version (" + channel + ") is " + result);
 
                 RemoteVersion finalResult = result;
                 Platform.runLater(() -> {
+                    checkingUpdate.set(false);
                     if (finalResult != null) {
                         latestVersion.set(finalResult);
                     }
-                    checkingUpdate.set(false);
                 });
             }, "Update Checker", true);
         });

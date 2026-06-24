@@ -18,22 +18,18 @@
 package org.jackhuang.hmcl.util.platform.hardware;
 
 import org.jackhuang.hmcl.util.StringUtils;
-import org.jetbrains.annotations.NotNullByDefault;
 import org.jetbrains.annotations.Nullable;
-import org.jetbrains.annotations.UnknownNullability;
-import org.jetbrains.annotations.Unmodifiable;
 
-import java.nio.file.Path;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/// @author Glavo
-@NotNullByDefault
+/**
+ * @author Glavo
+ */
 public final class GraphicsCard {
 
-    @UnknownNullability
-    public static String cleanName(@UnknownNullability String name) {
+    public static String cleanName(String name) {
         if (name == null)
             return null;
 
@@ -62,15 +58,13 @@ public final class GraphicsCard {
     private final @Nullable Type type;
     private final @Nullable String driver;
     private final @Nullable String driverVersion;
-    private final @Unmodifiable List<Path> vulkanDriverFiles;
 
-    private GraphicsCard(String name, @Nullable HardwareVendor vendor, @Nullable Type type, @Nullable String driver, @Nullable String driverVersion, List<Path> vulkanDriverFiles) {
+    private GraphicsCard(String name, @Nullable HardwareVendor vendor, @Nullable Type type, @Nullable String driver, @Nullable String driverVersion) {
         this.name = Objects.requireNonNull(name);
         this.vendor = vendor;
         this.type = type;
         this.driver = driver;
         this.driverVersion = driverVersion;
-        this.vulkanDriverFiles = vulkanDriverFiles;
     }
 
     public String getName() {
@@ -83,10 +77,6 @@ public final class GraphicsCard {
 
     public @Nullable String getDriverVersion() {
         return driverVersion;
-    }
-
-    public List<Path> getVulkanDriverFiles() {
-        return vulkanDriverFiles;
     }
 
     @Override
@@ -106,12 +96,11 @@ public final class GraphicsCard {
     }
 
     public static final class Builder {
-        private @Nullable String name;
-        private @Nullable HardwareVendor vendor;
-        private @Nullable Type type;
-        private @Nullable String driver;
-        private @Nullable String driverVersion;
-        private @Nullable List<Path> vulkanDriverFiles;
+        private String name;
+        private HardwareVendor vendor;
+        private Type type;
+        private String driver;
+        private String driverVersion;
 
         public GraphicsCard build() {
             String name = this.name;
@@ -122,12 +111,10 @@ public final class GraphicsCard {
                     name = "Unknown";
             }
 
-            List<Path> vulkanDriverFiles = Objects.requireNonNullElse(this.vulkanDriverFiles, List.of());
-
-            return new GraphicsCard(name, vendor, type, driver, driverVersion, List.copyOf(vulkanDriverFiles));
+            return new GraphicsCard(name, vendor, type, driver, driverVersion);
         }
 
-        public @Nullable String getName() {
+        public String getName() {
             return name;
         }
 
@@ -136,7 +123,7 @@ public final class GraphicsCard {
             return this;
         }
 
-        public @Nullable HardwareVendor getVendor() {
+        public HardwareVendor getVendor() {
             return vendor;
         }
 
@@ -145,7 +132,7 @@ public final class GraphicsCard {
             return this;
         }
 
-        public @Nullable Type getType() {
+        public Type getType() {
             return type;
         }
 
@@ -154,7 +141,7 @@ public final class GraphicsCard {
             return this;
         }
 
-        public @Nullable String getDriver() {
+        public String getDriver() {
             return driver;
         }
 
@@ -163,21 +150,12 @@ public final class GraphicsCard {
             return this;
         }
 
-        public @Nullable String getDriverVersion() {
+        public String getDriverVersion() {
             return driverVersion;
         }
 
         public Builder setDriverVersion(String driverVersion) {
             this.driverVersion = driverVersion;
-            return this;
-        }
-
-        public @Nullable List<Path> getVulkanDriverFiles() {
-            return vulkanDriverFiles;
-        }
-
-        public Builder setVulkanDriverFiles(@Nullable List<Path> files) {
-            this.vulkanDriverFiles = files;
             return this;
         }
     }

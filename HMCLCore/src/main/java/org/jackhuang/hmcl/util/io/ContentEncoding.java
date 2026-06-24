@@ -22,7 +22,6 @@ import org.jetbrains.annotations.NotNull;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLConnection;
-import java.net.http.HttpHeaders;
 import java.util.zip.GZIPInputStream;
 
 /**
@@ -45,17 +44,6 @@ public enum ContentEncoding {
     public static @NotNull ContentEncoding fromConnection(URLConnection connection) throws IOException {
         String encoding = connection.getContentEncoding();
         if (encoding == null || encoding.isEmpty() || "identity".equals(encoding)) {
-            return IDENTITY;
-        } else if ("gzip".equalsIgnoreCase(encoding)) {
-            return GZIP;
-        } else {
-            throw new IOException("Unsupported content encoding: " + encoding);
-        }
-    }
-
-    public static @NotNull ContentEncoding fromHeaders(HttpHeaders headers) throws IOException {
-        String encoding = headers.firstValue("content-encoding").orElse("");
-        if (encoding.isEmpty() || "identity".equals(encoding)) {
             return IDENTITY;
         } else if ("gzip".equalsIgnoreCase(encoding)) {
             return GZIP;

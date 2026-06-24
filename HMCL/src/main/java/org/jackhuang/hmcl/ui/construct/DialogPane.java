@@ -41,8 +41,11 @@ public class DialogPane extends JFXDialogLayout {
     private final JFXProgressBar progressBar = new JFXProgressBar();
 
     public DialogPane() {
+        this.setStyle("-fx-background-color: #0A0A0F;");
+        
         Label titleLabel = new Label();
         titleLabel.textProperty().bind(title);
+        titleLabel.setStyle("-fx-text-fill: #FFFFFF; -fx-font-size: 18px; -fx-font-weight: bold;");
         setHeading(titleLabel);
         getChildren().add(progressBar);
 
@@ -50,20 +53,24 @@ public class DialogPane extends JFXDialogLayout {
         StackPane.setMargin(progressBar, new Insets(-24.0D, -24.0D, -16.0D, -24.0D));
         StackPane.setAlignment(progressBar, Pos.TOP_CENTER);
         progressBar.setMaxWidth(Double.MAX_VALUE);
+        progressBar.setStyle("-fx-background-color: #0A0A0F;");
 
         JFXButton acceptButton = new JFXButton(i18n("button.ok"));
         acceptButton.setOnAction(e -> onAccept());
         acceptButton.disableProperty().bind(valid.not());
         acceptButton.getStyleClass().add("dialog-accept");
         acceptPane.getStyleClass().add("small-spinner-pane");
+        acceptPane.setStyle("-fx-background-color: transparent;");
         acceptPane.setContent(acceptButton);
 
         cancelButton.setText(i18n("button.cancel"));
         cancelButton.setOnAction(e -> onCancel());
         cancelButton.getStyleClass().add("dialog-cancel");
+        cancelButton.setStyle("-fx-background-color: #1a1a1a; -fx-text-fill: #FFFFFF;");
         onEscPressed(this, cancelButton::fire);
 
         setActions(warningLabel, acceptPane, cancelButton);
+        this.setStyle("-fx-background-color: #0A0A0F; -fx-padding: 0;");
     }
 
     protected JFXProgressBar getProgressBar() {

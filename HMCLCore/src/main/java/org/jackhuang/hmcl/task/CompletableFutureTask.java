@@ -17,10 +17,9 @@
  */
 package org.jackhuang.hmcl.task;
 
-import org.jackhuang.hmcl.util.Lang;
-
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
 
 public abstract class CompletableFutureTask<T> extends Task<T> {
 
@@ -30,11 +29,18 @@ public abstract class CompletableFutureTask<T> extends Task<T> {
 
     public abstract CompletableFuture<T> getFuture(TaskCompletableFuture executor);
 
+    protected static Throwable resolveException(Throwable e) {
+        if (e instanceof ExecutionException || e instanceof CompletionException)
+            return resolveException(e.getCause());
+        else
+            return e;
+    }
+
     public static class CustomException extends RuntimeException {}
 
     protected static CompletableFuture<Void> breakable(CompletableFuture<?> future) {
         return future.thenApplyAsync(unused1 -> (Void) null).exceptionally(throwable -> {
-            if (Lang.resolveException(throwable) instanceof CustomException) return null;
+            if (resolveException(throwable) instanceof CustomException) return null;
             else throw new CompletionException(throwable);
         });
     }

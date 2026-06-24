@@ -104,7 +104,7 @@ public class DefaultCacheRepository extends CacheRepository {
                 if (hash.equalsIgnoreCase(checksum))
                     cacheLibrary(library, jar, false);
             } else if (library.getChecksums() != null && !library.getChecksums().isEmpty()) {
-                if (LibraryDownloadTask.checksumValid(jar, library.getChecksums()))
+                if (LibraryDownloadTask.checksumValid(jar.toFile(), library.getChecksums()))
                     cacheLibrary(library, jar, true);
             } else {
                 // or we will not cache the library
@@ -139,7 +139,7 @@ public class DefaultCacheRepository extends CacheRepository {
                 if (fileExists(SHA1, libIndex.getHash())) {
                     Path file = getFile(SHA1, libIndex.getHash());
                     if (libIndex.getType().equalsIgnoreCase(LibraryIndex.TYPE_FORGE)) {
-                        if (LibraryDownloadTask.checksumValid(file, library.getChecksums()))
+                        if (LibraryDownloadTask.checksumValid(file.toFile(), library.getChecksums()))
                             return Optional.of(file);
                     }
                 }
@@ -157,7 +157,7 @@ public class DefaultCacheRepository extends CacheRepository {
                     if (hash.equalsIgnoreCase(checksum))
                         return Optional.of(restore(jar, () -> cacheLibrary(library, jar, false)));
                 } else if (library.getChecksums() != null && !library.getChecksums().isEmpty()) {
-                    if (LibraryDownloadTask.checksumValid(jar, library.getChecksums()))
+                    if (LibraryDownloadTask.checksumValid(jar.toFile(), library.getChecksums()))
                         return Optional.of(restore(jar, () -> cacheLibrary(library, jar, true)));
                 } else {
                     return Optional.of(jar);
@@ -181,7 +181,7 @@ public class DefaultCacheRepository extends CacheRepository {
      */
     public Path cacheLibrary(Library library, Path path, boolean forge) throws IOException {
         String hash = library.getDownload().getSha1();
-        if (!DigestUtils.isSha1Digest(hash))
+        if (hash == null)
             hash = DigestUtils.digestToString(SHA1, path);
 
         Path cache = getFile(SHA1, hash);

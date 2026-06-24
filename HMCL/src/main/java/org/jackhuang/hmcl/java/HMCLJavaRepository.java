@@ -30,9 +30,7 @@ import org.jackhuang.hmcl.util.platform.Platform;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
-import java.nio.file.DirectoryStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.nio.file.*;
 import java.util.*;
 
 import static org.jackhuang.hmcl.util.logging.Logger.LOG;
@@ -59,7 +57,7 @@ public final class HMCLJavaRepository implements JavaRepository {
     }
 
     public Path getJavaDir(Platform platform, GameJavaVersion gameJavaVersion) {
-        return getJavaDir(platform, MOJANG_JAVA_PREFIX + gameJavaVersion.component());
+        return getJavaDir(platform, MOJANG_JAVA_PREFIX + gameJavaVersion.getComponent());
     }
 
     @Override
@@ -68,7 +66,7 @@ public final class HMCLJavaRepository implements JavaRepository {
     }
 
     public Path getManifestFile(Platform platform, GameJavaVersion gameJavaVersion) {
-        return getManifestFile(platform, MOJANG_JAVA_PREFIX + gameJavaVersion.component());
+        return getManifestFile(platform, MOJANG_JAVA_PREFIX + gameJavaVersion.getComponent());
     }
 
     public boolean isInstalled(Platform platform, String name) {
@@ -76,7 +74,7 @@ public final class HMCLJavaRepository implements JavaRepository {
     }
 
     public boolean isInstalled(Platform platform, GameJavaVersion gameJavaVersion) {
-        return isInstalled(platform, MOJANG_JAVA_PREFIX + gameJavaVersion.component());
+        return isInstalled(platform, MOJANG_JAVA_PREFIX + gameJavaVersion.getComponent());
     }
 
     public @Nullable Path getJavaExecutable(Platform platform, String name) {
@@ -96,10 +94,10 @@ public final class HMCLJavaRepository implements JavaRepository {
     }
 
     public @Nullable Path getJavaExecutable(Platform platform, GameJavaVersion gameJavaVersion) {
-        return getJavaExecutable(platform, MOJANG_JAVA_PREFIX + gameJavaVersion.component());
+        return getJavaExecutable(platform, MOJANG_JAVA_PREFIX + gameJavaVersion.getComponent());
     }
 
-    private static void getAllJava(List<Path> list, Platform platform, Path platformRoot) {
+    private static void getAllJava(List<JavaRuntime> list, Platform platform, Path platformRoot, boolean isManaged) {
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(platformRoot)) {
             for (Path file : stream) {
                 try {
@@ -117,7 +115,8 @@ public final class HMCLJavaRepository implements JavaRepository {
                         }
 
                         if (Files.isDirectory(javaDir)) {
-                            list.add(executable);
+                            JavaManifest manifest = JsonUtils.fromJsonFile(file, JavaManifest.class);
+                            list.add(JavaRuntime.of(executable, manifest.getInfo(), isManaged));
                         }
                     }
                 } catch (Throwable e) {
@@ -130,23 +129,28 @@ public final class HMCLJavaRepository implements JavaRepository {
     }
 
     @Override
-    public Collection<Path> getAllJava(Platform platform) {
+    public Collection<JavaRuntime> getAllJava(Platform platform) {
         Path platformRoot = getPlatformRoot(platform);
         if (!Files.isDirectory(platformRoot))
             return Collections.emptyList();
 
-        ArrayList<Path> list = new ArrayList<>();
+        ArrayList<JavaRuntime> list = new ArrayList<>();
 
-        getAllJava(list, platform, platformRoot);
+        getAllJava(list, platform, platformRoot, true);
+        if (platform.getOperatingSystem() == OperatingSystem.MACOS) {
+            platformRoot = root.resolve(platform.getOperatingSystem().getMojangName() + "-" + platform.getArchitecture().getCheckedName());
+            if (Files.isDirectory(platformRoot))
+                getAllJava(list, platform, platformRoot, false);
+        }
+
         return list;
     }
 
     @Override
     public Task<JavaRuntime> getDownloadJavaTask(DownloadProvider downloadProvider, Platform platform, GameJavaVersion gameJavaVersion) {
         Path javaDir = getJavaDir(platform, gameJavaVersion);
-        Path tempDir = getPlatformRoot(platform).resolve(".tmp").resolve(javaDir.getFileName());
 
-        return new MojangJavaDownloadTask(downloadProvider, javaDir, tempDir, gameJavaVersion, JavaManager.getMojangJavaPlatform(platform)).thenApplyAsync(result -> {
+        return new MojangJavaDownloadTask(downloadProvider, javaDir, gameJavaVersion, JavaManager.getMojangJavaPlatform(platform)).thenApplyAsync(result -> {
             Path executable;
             try {
                 executable = JavaManager.getExecutable(javaDir).toRealPath();
@@ -159,16 +163,16 @@ public final class HMCLJavaRepository implements JavaRepository {
 
             JavaInfo info;
             if (JavaManager.isCompatible(platform))
-                info = JavaInfoUtils.fromExecutable(executable);
+                info = JavaInfoUtils.fromExecutable(executable, false);
             else
-                info = new JavaInfo(platform, result.download().version().name(), null);
+                info = new JavaInfo(platform, result.download.getVersion().getName(), null);
 
             Map<String, Object> update = new LinkedHashMap<>();
             update.put("provider", "mojang");
-            update.put("component", gameJavaVersion.component());
+            update.put("component", gameJavaVersion.getComponent());
 
             Map<String, JavaLocalFiles.Local> files = new LinkedHashMap<>();
-            result.remoteFiles().getFiles().forEach((path, file) -> {
+            result.remoteFiles.getFiles().forEach((path, file) -> {
                 if (file instanceof MojangJavaRemoteFiles.RemoteFile) {
                     DownloadInfo downloadInfo = ((MojangJavaRemoteFiles.RemoteFile) file).getDownloads().get("raw");
                     if (downloadInfo != null) {
@@ -203,7 +207,7 @@ public final class HMCLJavaRepository implements JavaRepository {
     public Task<Void> getUninstallJavaTask(Platform platform, String name) {
         return Task.runAsync(() -> {
             Files.deleteIfExists(getManifestFile(platform, name));
-            FileUtils.deleteDirectory(getJavaDir(platform, name));
+            FileUtils.deleteDirectory(getJavaDir(platform, name).toFile());
         });
     }
 
@@ -216,7 +220,7 @@ public final class HMCLJavaRepository implements JavaRepository {
             if (relativized.getNameCount() > 1) {
                 String name = relativized.getName(0).toString();
                 Files.deleteIfExists(getManifestFile(java.getPlatform(), name));
-                FileUtils.deleteDirectory(getJavaDir(java.getPlatform(), name));
+                FileUtils.deleteDirectory(getJavaDir(java.getPlatform(), name).toFile());
             }
         });
     }

@@ -60,6 +60,7 @@ public class ClassicAccountLoginDialog extends StackPane {
         progressBar.setVisible(false);
 
         JFXDialogLayout dialogLayout = new JFXDialogLayout();
+        dialogLayout.setStyle("-fx-background-color: #0A0A0F;");
 
         {
             dialogLayout.setHeading(new Label(i18n("login.enter_password")));
@@ -69,7 +70,7 @@ public class ClassicAccountLoginDialog extends StackPane {
             VBox body = new VBox(15);
             body.setPadding(new Insets(15, 0, 0, 0));
 
-            Label usernameLabel = new Label(oldAccount.getLoginName());
+            Label usernameLabel = new Label(oldAccount.getUsername());
 
             txtPassword = new JFXPasswordField();
             txtPassword.setOnAction(e -> onAccept());

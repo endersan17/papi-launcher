@@ -17,67 +17,100 @@
  */
 package org.jackhuang.hmcl.ui.decorator;
 
+import com.jfoenix.controls.JFXDialog;
 import com.jfoenix.controls.JFXSnackbar;
-import com.jfoenix.controls.JFXSnackbarLayout;
-import javafx.animation.Interpolator;
+import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
+import javafx.animation.Timeline;
+import javafx.application.Platform;
 import javafx.beans.InvalidationListener;
 import javafx.beans.WeakInvalidationListener;
-import javafx.beans.property.BooleanProperty;
+import javafx.beans.value.ChangeListener;
+import javafx.beans.value.ObservableValue;
+import javafx.event.EventHandler;
 import javafx.geometry.Insets;
 import javafx.scene.Node;
 import javafx.scene.image.Image;
+import javafx.scene.image.PixelFormat;
 import javafx.scene.image.PixelReader;
 import javafx.scene.image.PixelWriter;
 import javafx.scene.image.WritableImage;
+import org.jackhuang.hmcl.setting.Theme;
 import javafx.scene.input.*;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
 import javafx.stage.Stage;
 import javafx.util.Duration;
-import org.glavo.url.WebURL;
+import org.jackhuang.hmcl.Launcher;
 import org.jackhuang.hmcl.Metadata;
 import org.jackhuang.hmcl.auth.authlibinjector.AuthlibInjectorDnD;
-import org.jackhuang.hmcl.setting.BackgroundType;
+import org.jackhuang.hmcl.setting.EnumBackgroundImage;
 import org.jackhuang.hmcl.task.Schedulers;
 import org.jackhuang.hmcl.task.Task;
 import org.jackhuang.hmcl.ui.Controllers;
-import org.jackhuang.hmcl.ui.DialogUtils;
 import org.jackhuang.hmcl.ui.FXUtils;
 import org.jackhuang.hmcl.ui.account.AddAuthlibInjectorServerPane;
+import org.jackhuang.hmcl.ui.animation.AnimationUtils;
 import org.jackhuang.hmcl.ui.animation.ContainerAnimations;
-import org.jackhuang.hmcl.ui.animation.Motion;
-import org.jackhuang.hmcl.ui.animation.TransitionPane.AnimationProducer;
-import org.jackhuang.hmcl.ui.construct.JFXDialogPane;
+import org.jackhuang.hmcl.ui.construct.DialogAware;
+import org.jackhuang.hmcl.ui.construct.DialogCloseEvent;
 import org.jackhuang.hmcl.ui.construct.Navigator;
+import org.jackhuang.hmcl.ui.construct.JFXDialogPane;
 import org.jackhuang.hmcl.ui.wizard.Refreshable;
 import org.jackhuang.hmcl.ui.wizard.WizardProvider;
-import org.jackhuang.hmcl.util.MathUtils;
+import org.jackhuang.hmcl.util.Lang;
 import org.jackhuang.hmcl.util.platform.OperatingSystem;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Locale;
-import java.util.Random;
-import java.util.stream.Collectors;
+import java.nio.file.Paths;
+import java.util.*;
 import java.util.stream.Stream;
 
-import static org.jackhuang.hmcl.setting.SettingsManager.settings;
+import static java.util.stream.Collectors.toList;
+import static org.jackhuang.hmcl.setting.ConfigHolder.config;
 import static org.jackhuang.hmcl.ui.FXUtils.newBuiltinImage;
 import static org.jackhuang.hmcl.ui.FXUtils.onEscPressed;
 import static org.jackhuang.hmcl.util.io.FileUtils.getExtension;
 import static org.jackhuang.hmcl.util.logging.Logger.LOG;
 
 public class DecoratorController {
+    private static final String PROPERTY_DIALOG_CLOSE_HANDLER = DecoratorController.class.getName() + ".dialog.closeListener";
+
     private final Decorator decorator;
     private final Navigator navigator;
 
+    private JFXDialog dialog;
+    private JFXDialogPane dialogPane;
+
     public DecoratorController(Stage stage, Node mainPage) {
         decorator = new Decorator(stage);
-        decorator.titleTransparentProperty().bind(settings().titleTransparentProperty());
+        decorator.setOnCloseButtonAction(() -> {
+            if (AnimationUtils.playWindowAnimation()) {
+                Timeline timeline = new Timeline(
+                        new KeyFrame(Duration.millis(0),
+                                new KeyValue(decorator.opacityProperty(), 1, FXUtils.EASE),
+                                new KeyValue(decorator.scaleXProperty(), 1, FXUtils.EASE),
+                                new KeyValue(decorator.scaleYProperty(), 1, FXUtils.EASE),
+                                new KeyValue(decorator.scaleZProperty(), 0.3, FXUtils.EASE)
+                        ),
+                        new KeyFrame(Duration.millis(200),
+                                new KeyValue(decorator.opacityProperty(), 0, FXUtils.EASE),
+                                new KeyValue(decorator.scaleXProperty(), 0.8, FXUtils.EASE),
+                                new KeyValue(decorator.scaleYProperty(), 0.8, FXUtils.EASE),
+                                new KeyValue(decorator.scaleZProperty(), 0.8, FXUtils.EASE)
+                        )
+                );
+                timeline.setOnFinished(event -> Launcher.stopApplication());
+                timeline.play();
+            } else {
+                Launcher.stopApplication();
+            }
+        });
+        decorator.titleTransparentProperty().bind(config().titleTransparentProperty());
 
         navigator = new Navigator();
         navigator.setOnNavigated(this::onNavigated);
@@ -94,32 +127,28 @@ public class DecoratorController {
         decorator.setContentBackground(getBackground());
         changeBackgroundListener = o -> updateBackground();
         WeakInvalidationListener weakListener = new WeakInvalidationListener(changeBackgroundListener);
-        settings().backgroundTypeProperty().addListener(weakListener);
-        settings().backgroundImageProperty().addListener(weakListener);
-        settings().backgroundImageUrlProperty().addListener(weakListener);
-        settings().backgroundPaintProperty().addListener(weakListener);
-        settings().backgroundOpacityProperty().addListener(weakListener);
+        config().backgroundImageTypeProperty().addListener(weakListener);
+        config().backgroundImageProperty().addListener(weakListener);
+        config().backgroundImageUrlProperty().addListener(weakListener);
+        config().backgroundPaintProperty().addListener(weakListener);
+        config().backgroundImageOpacityProperty().addListener(weakListener);
+        config().themeProperty().addListener(weakListener);
 
         // pass key events to current dialog / current page
         decorator.addEventFilter(KeyEvent.ANY, e -> {
-            if (!(e.getTarget() instanceof Node t)) {
-                return;
+            if (!(e.getTarget() instanceof Node)) {
+                return; // event source can't be determined
             }
 
             Node newTarget;
-
-            JFXDialogPane currentDialogPane = null;
-            if (decorator.getDrawerWrapper() != null) {
-                currentDialogPane = (JFXDialogPane) decorator.getDrawerWrapper().getProperties().get(DialogUtils.PROPERTY_DIALOG_PANE_INSTANCE);
-            }
-
-            if (currentDialogPane != null && currentDialogPane.peek().isPresent()) {
-                newTarget = currentDialogPane.peek().get();
+            if (dialogPane != null && dialogPane.peek().isPresent()) {
+                newTarget = dialogPane.peek().get(); // current dialog
             } else {
-                newTarget = navigator.getCurrentPage();
+                newTarget = navigator.getCurrentPage(); // current page
             }
-            boolean needsRedirect = true;
 
+            boolean needsRedirect = true;
+            Node t = (Node) e.getTarget();
             while (t != null) {
                 if (t == newTarget) {
                     // current event target is in newTarget
@@ -150,12 +179,17 @@ public class DecoratorController {
             });
         }
 
-        navigator.addEventFilter(MouseEvent.MOUSE_CLICKED, e -> {
-            if (e.getButton() == MouseButton.BACK) {
-                back();
-                e.consume();
-            }
-        });
+        try {
+            // For JavaFX 12+
+            MouseButton button = MouseButton.valueOf("BACK");
+            navigator.addEventFilter(MouseEvent.MOUSE_CLICKED, e -> {
+                if (e.getButton() == button) {
+                    back();
+                    e.consume();
+                }
+            });
+        } catch (IllegalArgumentException ignored) {
+        }
     }
 
     public Decorator getDecorator() {
@@ -185,29 +219,24 @@ public class DecoratorController {
     }
 
     private Background getBackground() {
-        BackgroundType imageType = settings().backgroundTypeProperty().get();
-        if (imageType == null)
-            imageType = BackgroundType.DEFAULT;
+        EnumBackgroundImage imageType = config().getBackgroundImageType();
 
         Image image = null;
         switch (imageType) {
             case CUSTOM:
-                String backgroundImage = settings().backgroundImageProperty().get();
+                String backgroundImage = config().getBackgroundImage();
                 if (backgroundImage != null)
                     try {
-                        Path path = Path.of(backgroundImage);
-                        image = Files.isDirectory(path)
-                                ? randomImageIn(path)
-                                : tryLoadImage(path);
+                        image = tryLoadImage(Paths.get(backgroundImage));
                     } catch (Exception e) {
                         LOG.warning("Couldn't load background image", e);
                     }
                 break;
             case NETWORK:
-                String backgroundImageUrl = settings().backgroundImageUrlProperty().get();
+                String backgroundImageUrl = config().getBackgroundImageUrl();
                 if (backgroundImageUrl != null) {
                     try {
-                        image = FXUtils.loadImage(WebURL.parseBrowserInput(backgroundImageUrl));
+                        image = FXUtils.loadImage(backgroundImageUrl);
                     } catch (Exception e) {
                         LOG.warning("Couldn't load background image", e);
                     }
@@ -216,9 +245,14 @@ public class DecoratorController {
             case CLASSIC:
                 image = newBuiltinImage("/assets/img/background-classic.jpg");
                 break;
+            case PER_THEME:
+                image = loadPerThemeBackground();
+                break;
+            case TRANSLUCENT: // Deprecated
+                return new Background(new BackgroundFill(new Color(1, 1, 1, 0.5), CornerRadii.EMPTY, Insets.EMPTY));
             case PAINT:
-                Paint paint = settings().backgroundPaintProperty().get();
-                double opacity = MathUtils.clamp(settings().backgroundOpacityProperty().get(), 0., 1.);
+                Paint paint = config().getBackgroundPaint();
+                double opacity = Lang.clamp(0, config().getBackgroundImageOpacity(), 100) / 100.;
                 if (paint instanceof Color || paint == null) {
                     Color color = (Color) paint;
                     if (color == null)
@@ -232,15 +266,18 @@ public class DecoratorController {
                 }
         }
         if (image == null) {
+            if (imageType == EnumBackgroundImage.PER_THEME) {
+                LOG.info("No per-theme background image found, falling back to default background");
+            }
             image = loadDefaultBackgroundImage();
         }
-        return createBackgroundWithOpacity(image, settings().backgroundOpacityProperty().get());
+        return createBackgroundWithOpacity(image, config().getBackgroundImageOpacity());
     }
 
-    private Background createBackgroundWithOpacity(Image image, double opacity) {
+    private Background createBackgroundWithOpacity(Image image, int opacity) {
         if (opacity <= 0) {
             return new Background(new BackgroundFill(new Color(1, 1, 1, 0), CornerRadii.EMPTY, Insets.EMPTY));
-        } else if (opacity >= 1. || image.getPixelReader() == null) {
+        } else if (opacity >= 100) {
             return new Background(new BackgroundImage(
                     image,
                     BackgroundRepeat.NO_REPEAT,
@@ -249,16 +286,20 @@ public class DecoratorController {
                     new BackgroundSize(800, 480, false, false, true, true)
             ));
         } else {
-            WritableImage tempImage = new WritableImage((int) image.getWidth(), (int) image.getHeight());
+            int w = (int) image.getWidth();
+            int h = (int) image.getHeight();
+            WritableImage tempImage = new WritableImage(w, h);
             PixelReader pixelReader = image.getPixelReader();
             PixelWriter pixelWriter = tempImage.getPixelWriter();
-            for (int y = 0; y < image.getHeight(); y++) {
-                for (int x = 0; x < image.getWidth(); x++) {
-                    Color color = pixelReader.getColor(x, y);
-                    Color newColor = new Color(color.getRed(), color.getGreen(), color.getBlue(), color.getOpacity() * opacity);
-                    pixelWriter.setColor(x, y, newColor);
-                }
+            int[] pixels = new int[w * h];
+            pixelReader.getPixels(0, 0, w, h, PixelFormat.getIntArgbPreInstance(), pixels, 0, w);
+            double alpha = opacity / 100.0;
+            for (int i = 0; i < pixels.length; i++) {
+                int argb = pixels[i];
+                int a = (int) (((argb >> 24) & 0xFF) * alpha);
+                pixels[i] = (a << 24) | (argb & 0x00FFFFFF);
             }
+            pixelWriter.setPixels(0, 0, w, h, PixelFormat.getIntArgbPreInstance(), pixels, 0, w);
 
             return new Background(new BackgroundImage(
                     tempImage,
@@ -271,15 +312,32 @@ public class DecoratorController {
     }
 
     /**
+     * Load background image matching the current theme name.
+     * Looks for /assets/img/background-[themeName].jpg
+     */
+    private @Nullable Image loadPerThemeBackground() {
+        Theme theme = Theme.getTheme();
+        if (theme == null) return null;
+        String themeName = theme.getName().toLowerCase(Locale.ROOT);
+        String path = "/assets/img/background-" + themeName + ".jpg";
+        try {
+            return newBuiltinImage(path);
+        } catch (Exception e) {
+            LOG.warning("Couldn't load per-theme background: " + path, e);
+            return null;
+        }
+    }
+
+    /**
      * Load background image from bg/, background.png, background.jpg, background.gif
      */
     private Image loadDefaultBackgroundImage() {
-        Image image = randomImageIn(Metadata.HMCL_LOCAL_HOME.resolve("background"));
+        Image image = randomImageIn(Metadata.HMCL_CURRENT_DIRECTORY.resolve("background"));
         if (image != null)
             return image;
 
         for (String extension : FXUtils.IMAGE_EXTENSIONS) {
-            image = tryLoadImage(Metadata.HMCL_LOCAL_HOME.resolve("background." + extension));
+            image = tryLoadImage(Metadata.HMCL_CURRENT_DIRECTORY.resolve("background." + extension));
             if (image != null)
                 return image;
         }
@@ -302,14 +360,14 @@ public class DecoratorController {
             return null;
         }
 
-        ArrayList<Path> candidates;
+        List<Path> candidates;
         try (Stream<Path> stream = Files.list(imageDir)) {
             candidates = stream
                     .filter(it -> FXUtils.IMAGE_EXTENSIONS.contains(getExtension(it).toLowerCase(Locale.ROOT)))
                     .filter(Files::isReadable)
-                    .collect(Collectors.toCollection(ArrayList::new));
+                    .collect(toList());
         } catch (IOException e) {
-            LOG.warning("Failed to list files in " + imageDir, e);
+            LOG.warning("Failed to list files in ./bg", e);
             return null;
         }
 
@@ -339,20 +397,19 @@ public class DecoratorController {
 
     // ==== Navigation ====
 
-    public void navigate(Node node, AnimationProducer animationProducer, Duration duration, Interpolator interpolator) {
-        navigator.navigate(node, animationProducer, duration, interpolator);
-    }
+    private static final DecoratorAnimationProducer animation = new DecoratorAnimationProducer();
 
-    public BooleanProperty backableProperty() {
-        return navigator.backableProperty();
+    public void navigate(Node node) {
+        navigator.navigate(node, animation);
     }
 
     private void close() {
         if (navigator.getCurrentPage() instanceof DecoratorPage) {
             DecoratorPage page = (DecoratorPage) navigator.getCurrentPage();
 
+            // FIXME: Get WorldPage working first, and revisit this later
+            page.closePage();
             if (page.isPageCloseable()) {
-                page.closePage();
                 return;
             }
         }
@@ -423,22 +480,85 @@ public class DecoratorController {
     }
 
     // ==== Dialog ====
+
     public void showDialog(Node node) {
-        DialogUtils.show(decorator, node);
+        FXUtils.checkFxUserThread();
+
+        if (dialog == null) {
+            if (decorator.getDrawerWrapper() == null) {
+                // Sometimes showDialog will be invoked before decorator was initialized.
+                // Keep trying again.
+                Platform.runLater(() -> showDialog(node));
+                return;
+            }
+            dialog = new JFXDialog();
+            dialogPane = new JFXDialogPane();
+
+            dialog.setContent(dialogPane);
+            decorator.capableDraggingWindow(dialog);
+            decorator.forbidDraggingWindow(dialogPane);
+            dialog.setDialogContainer(decorator.getDrawerWrapper());
+            dialog.setOverlayClose(false);
+            dialog.show();
+
+            navigator.setDisable(true);
+        }
+        dialogPane.push(node);
+
+        EventHandler<DialogCloseEvent> handler = event -> closeDialog(node);
+        node.getProperties().put(PROPERTY_DIALOG_CLOSE_HANDLER, handler);
+        node.addEventHandler(DialogCloseEvent.CLOSE, handler);
+
+        if (dialog.isVisible()) {
+            dialog.requestFocus();
+            if (node instanceof DialogAware)
+                ((DialogAware) node).onDialogShown();
+        } else {
+            dialog.visibleProperty().addListener(new ChangeListener<Boolean>() {
+                @Override
+                public void changed(ObservableValue<? extends Boolean> observable, Boolean oldValue, Boolean newValue) {
+                    if (newValue) {
+                        dialog.requestFocus();
+                        if (node instanceof DialogAware)
+                            ((DialogAware) node).onDialogShown();
+                        observable.removeListener(this);
+                    }
+                }
+            });
+        }
     }
 
+    @SuppressWarnings("unchecked")
     private void closeDialog(Node node) {
-        DialogUtils.close(node);
-    }
+        FXUtils.checkFxUserThread();
 
-    public void showDialogLater(Node node) {
-        DialogUtils.showLater(decorator, node);
+        Optional.ofNullable(node.getProperties().get(PROPERTY_DIALOG_CLOSE_HANDLER))
+                .ifPresent(handler -> node.removeEventHandler(DialogCloseEvent.CLOSE, (EventHandler<DialogCloseEvent>) handler));
+
+        if (dialog != null) {
+            JFXDialogPane pane = dialogPane;
+
+            if (pane.size() == 1 && pane.peek().orElse(null) == node) {
+                dialog.setOnDialogClosed(e -> pane.pop(node));
+                dialog.close();
+                dialog = null;
+                dialogPane = null;
+
+                navigator.setDisable(false);
+            } else {
+                pane.pop(node);
+            }
+
+            if (node instanceof DialogAware) {
+                ((DialogAware) node).onDialogClosed();
+            }
+        }
     }
 
     // ==== Toast ====
 
     public void showToast(String content) {
-        decorator.getSnackbar().fireEvent(new JFXSnackbar.SnackbarEvent(new JFXSnackbarLayout(content)));
+        decorator.getSnackbar().fireEvent(new JFXSnackbar.SnackbarEvent(content, null, 2000L, false, null));
     }
 
     // ==== Wizard ====
@@ -450,8 +570,7 @@ public class DecoratorController {
     public void startWizard(WizardProvider wizardProvider, String category) {
         FXUtils.checkFxUserThread();
 
-        navigator.navigate(new DecoratorWizardDisplayer(wizardProvider, category),
-                ContainerAnimations.FORWARD, Motion.SHORT4, Motion.EASE);
+        navigator.navigate(new DecoratorWizardDisplayer(wizardProvider, category), ContainerAnimations.FADE);
     }
 
     // ==== Authlib Injector DnD ====

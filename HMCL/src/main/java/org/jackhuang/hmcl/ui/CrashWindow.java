@@ -25,9 +25,11 @@ import javafx.scene.control.TextArea;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
+import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 import org.jackhuang.hmcl.Metadata;
 import org.jackhuang.hmcl.countly.CrashReport;
+import org.jackhuang.hmcl.setting.StyleSheets;
 import org.jackhuang.hmcl.upgrade.UpdateChecker;
 
 import static org.jackhuang.hmcl.util.i18n.I18n.i18n;
@@ -55,20 +57,23 @@ public class CrashWindow extends Stage {
         btnContact.setText(i18n("launcher.contact"));
         btnContact.setOnAction(event -> FXUtils.openLink(Metadata.CONTACT_URL));
         HBox box = new HBox();
-        box.setStyle("-fx-padding: 8px;");
+        box.setStyle("-fx-padding: 8px; -fx-background-color: #0A0A0F;");
         box.getChildren().add(btnContact);
         box.setAlignment(Pos.CENTER_RIGHT);
 
         BorderPane pane = new BorderPane();
+        pane.setStyle("-fx-background-color: #0A0A0F;");
         StackPane stackPane = new StackPane();
-        stackPane.setStyle("-fx-padding: 8px;");
+        stackPane.setStyle("-fx-padding: 8px; -fx-background-color: #0A0A0F;");
         stackPane.getChildren().add(lblCrash);
         pane.setTop(stackPane);
         pane.setCenter(textArea);
         pane.setBottom(box);
 
         Scene scene = new Scene(pane, 800, 480);
+        scene.setFill(Color.web("#0A0A0F"));
         setScene(scene);
+        StyleSheets.init(getScene());
         FXUtils.setIcon(this);
         setTitle(i18n("message.error"));
 

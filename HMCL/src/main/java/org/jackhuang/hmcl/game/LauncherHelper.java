@@ -20,9 +20,10 @@ package org.jackhuang.hmcl.game;
 import com.jfoenix.controls.JFXButton;
 import javafx.stage.Stage;
 import org.jackhuang.hmcl.Launcher;
+import org.jackhuang.hmcl.container.LaunchProfile;
+import org.jackhuang.hmcl.discord.DiscordRPCService;
 import org.jackhuang.hmcl.auth.*;
 import org.jackhuang.hmcl.auth.authlibinjector.AuthlibInjectorDownloadException;
-import org.jackhuang.hmcl.auth.offline.OfflineAccount;
 import org.jackhuang.hmcl.download.DefaultDependencyManager;
 import org.jackhuang.hmcl.download.DownloadProvider;
 import org.jackhuang.hmcl.download.LibraryAnalyzer;
@@ -50,50 +51,48 @@ import org.jackhuang.hmcl.util.platform.*;
 import org.jackhuang.hmcl.util.versioning.GameVersionNumber;
 import org.jackhuang.hmcl.util.versioning.VersionNumber;
 
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.lang.ref.WeakReference;
 import java.net.SocketTimeoutException;
+import java.nio.file.Paths;
 import java.net.URI;
 import java.nio.file.AccessDeniedException;
-import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
+import java.lang.ref.WeakReference;
 
 import static javafx.application.Platform.runLater;
 import static javafx.application.Platform.setImplicitExit;
-import static org.jackhuang.hmcl.setting.SettingsManager.state;
 import static org.jackhuang.hmcl.ui.FXUtils.runInFX;
 import static org.jackhuang.hmcl.util.DataSizeUnit.MEGABYTES;
 import static org.jackhuang.hmcl.util.Lang.resolveException;
 import static org.jackhuang.hmcl.util.i18n.I18n.i18n;
 import static org.jackhuang.hmcl.util.logging.Logger.LOG;
 import static org.jackhuang.hmcl.util.platform.Platform.SYSTEM_PLATFORM;
+import static org.jackhuang.hmcl.util.platform.Platform.isCompatibleWithX86Java;
 
 public final class LauncherHelper {
-
-    private static final String LWJGL_3_4_1_TIP = "lwjgl3.4.1-ffm";
 
     private final Profile profile;
     private Account account;
     private final String selectedVersion;
-    private Path scriptFile;
-    private final GameSettings.Effective setting;
+    private File scriptFile;
+    private File containerGameDir;
+    private LaunchProfile launchProfile;
+    private final VersionSetting setting;
     private LauncherVisibility launcherVisibility;
     private boolean showLogs;
-    private QuickPlayOption quickPlayOption;
-    private boolean disableOfflineSkin = false;
 
     public LauncherHelper(Profile profile, Account account, String selectedVersion) {
         this.profile = Objects.requireNonNull(profile);
         this.account = Objects.requireNonNull(account);
         this.selectedVersion = Objects.requireNonNull(selectedVersion);
-        this.setting = profile.getRepository().getEffectiveGameSettings(selectedVersion);
-        this.launcherVisibility = setting.getInheritable(GameSettings::launcherVisibilityProperty);
-        this.showLogs = setting.getInheritable(GameSettings::showLogsProperty);
+        this.setting = profile.getVersionSetting(selectedVersion);
+        this.launcherVisibility = setting.getLauncherVisibility();
+        this.showLogs = setting.isShowLogs();
         this.launchingStepsPane.setTitle(i18n("version.launch"));
     }
 
@@ -107,6 +106,14 @@ public final class LauncherHelper {
         this.account = account;
     }
 
+    public void setContainerGameDir(File containerGameDir) {
+        this.containerGameDir = containerGameDir;
+    }
+
+    public void setLaunchProfile(LaunchProfile launchProfile) {
+        this.launchProfile = launchProfile;
+    }
+
     public void setTestMode() {
         launcherVisibility = LauncherVisibility.KEEP;
         showLogs = true;
@@ -114,14 +121,6 @@ public final class LauncherHelper {
 
     public void setKeep() {
         launcherVisibility = LauncherVisibility.KEEP;
-    }
-
-    public void setQuickPlayOption(QuickPlayOption quickPlayOption) {
-        this.quickPlayOption = quickPlayOption;
-    }
-
-    public void setDisableOfflineSkin() {
-        disableOfflineSkin = true;
     }
 
     public void launch() {
@@ -133,14 +132,20 @@ public final class LauncherHelper {
         launch0();
     }
 
-    public void makeLaunchScript(Path scriptFile) {
+    public void makeLaunchScript(File scriptFile) {
         this.scriptFile = Objects.requireNonNull(scriptFile);
+
         launch();
     }
 
     private void launch0() {
         // https://github.com/HMCL-dev/HMCL/pull/4121
         PROCESSES.removeIf(it -> it.get() == null);
+
+        // Apply launch profile overrides to the version setting before any renderer/agent decisions
+        if (launchProfile != null && launchProfile.getExperimentalRendering() != null && launchProfile.getExperimentalRendering()) {
+            setting.setRenderer(Renderer.LLVMPIPE);
+        }
 
         HMCLGameRepository repository = profile.getRepository();
         DefaultDependencyManager dependencyManager = profile.getDependency();
@@ -157,7 +162,7 @@ public final class LauncherHelper {
                 .thenComposeAsync(java -> {
                     javaVersionRef.set(Objects.requireNonNull(java));
                     version.set(NativePatcher.patchNative(repository, version.get(), gameVersion.orElse(null), java, setting, javaArguments));
-                    if (setting.getInheritable(GameSettings::notCheckGameProperty))
+                    if (setting.isNotCheckGame())
                         return null;
                     return Task.allOf(
                             dependencyManager.checkGameCompletionAsync(version.get(), integrityCheck),
@@ -172,69 +177,77 @@ public final class LauncherHelper {
                                 }
                             }),
                             Task.composeAsync(() -> {
-                                if (OperatingSystem.CURRENT_OS != OperatingSystem.WINDOWS
-                                        || !(setting.getRenderer() instanceof Renderer.Driver renderer)
-                                        || renderer.mesaDriverName() == null)
-                                    return null;
+                                Renderer renderer = setting.getRenderer();
+                                if (renderer != Renderer.DEFAULT
+                                        && OperatingSystem.CURRENT_OS == OperatingSystem.WINDOWS
+                                        && OperatingSystem.WINDOWS_VERSION != null) {
+                                    Library lib = NativePatcher.getWindowsMesaLoader(java, renderer, OperatingSystem.WINDOWS_VERSION);
+                                    if (lib == null)
+                                        return null;
+                                    File file = dependencyManager.getGameRepository().getLibraryFile(version.get(), lib);
+                                    if (file.getAbsolutePath().indexOf('=') >= 0) {
+                                        LOG.warning("Invalid character '=' in the libraries directory path, unable to attach software renderer loader");
+                                        return null;
+                                    }
 
-                                Library lib = NativePatcher.getWindowsMesaLoader(java, renderer, OperatingSystem.SYSTEM_VERSION);
-                                if (lib == null)
-                                    return null;
-                                Path file = dependencyManager.getGameRepository().getLibraryFile(version.get(), lib);
-                                if (file.toAbsolutePath().toString().indexOf('=') >= 0) {
-                                    LOG.warning("Invalid character '=' in the libraries directory path, unable to attach software renderer loader");
-                                    return null;
-                                }
+                                    String agent = file.getAbsolutePath() + "=" + renderer.name().toLowerCase(Locale.ROOT);
 
-                                String agent = FileUtils.getAbsolutePath(file) + "=" + renderer.mesaDriverName();
-
-                                if (GameLibrariesTask.shouldDownloadLibrary(repository, version.get(), lib, integrityCheck)) {
-                                    return new LibraryDownloadTask(dependencyManager, file, lib)
-                                            .thenRunAsync(() -> javaAgents.add(agent));
+                                    if (GameLibrariesTask.shouldDownloadLibrary(repository, version.get(), lib, integrityCheck)) {
+                                        return new LibraryDownloadTask(dependencyManager, file, lib)
+                                                .thenRunAsync(() -> javaAgents.add(agent));
+                                    } else {
+                                        javaAgents.add(agent);
+                                        return null;
+                                    }
                                 } else {
-                                    javaAgents.add(agent);
                                     return null;
                                 }
                             })
                     );
                 }).withStage("launch.state.dependencies")
                 .thenComposeAsync(() -> gameVersion.map(s -> new GameVerificationFixTask(dependencyManager, s, version.get())).orElse(null))
-                .thenComposeAsync(() -> {
-                    if (setting.getInheritable(GameSettings::allowAutoAgentProperty)
-                            || setting.getInheritable(GameSettings::noJVMOptionsProperty)
-                            || setting.getInheritable(GameSettings::noOptimizingJVMOptionsProperty)
-                            || Boolean.TRUE.equals(state().getShownTips().get(LWJGL_3_4_1_TIP))
-                            || !NativePatcher.needPatchMemoryUtil(version.get(), javaVersionRef.get().getParsedVersion())) {
-                        return Task.completed(null);
-                    } else {
-                        CompletableFuture<Void> future = new CompletableFuture<>();
-                        runInFX(() -> {
-                            Controllers.confirm(i18n("launch.advice.lwjgl_3_4_1"), i18n("launch.advice.lwjgl_3_4_1.title"), MessageType.QUESTION, () -> {
-                                state().getShownTips().put(LWJGL_3_4_1_TIP, true);
-                                enableAutoAgentForCurrentSetting();
-                                future.complete(null);
-                            }, () -> {
-                                state().getShownTips().put(LWJGL_3_4_1_TIP, true);
-                                future.complete(null);
-                            });
-                        });
-                        return Task.fromCompletableFuture(future);
-                    }
-                })
                 .thenComposeAsync(() -> logIn(account).withStage("launch.state.logging_in"))
                 .thenComposeAsync(authInfo -> Task.supplyAsync(() -> {
-                    LaunchOptions.Builder launchOptionsBuilder = repository.getLaunchOptions(
-                            selectedVersion, javaVersionRef.get(), profile.getPath().toPath(), javaAgents, javaArguments, scriptFile != null);
-                    if (disableOfflineSkin) {
-                        launchOptionsBuilder.setDaemon(false);
-                    }
-                    if (quickPlayOption != null) {
-                        launchOptionsBuilder.setQuickPlayOption(quickPlayOption);
+                    File effectiveGameDir = containerGameDir != null ? containerGameDir : profile.getGameDir();
+                    LaunchOptions launchOptions = repository.getLaunchOptions(
+                            selectedVersion, javaVersionRef.get(), effectiveGameDir, javaAgents, javaArguments, scriptFile != null);
+
+                    if (launchProfile != null) {
+                        LaunchOptions.Builder builder = LaunchOptions.Builder.from(launchOptions);
+                        if (launchProfile.getMaxMemory() != null)
+                            builder.setMaxMemory(launchProfile.getMaxMemory());
+                        if (launchProfile.getMinMemory() != null)
+                            builder.setMinMemory(launchProfile.getMinMemory());
+                        if (launchProfile.getJvmArgs() != null) {
+                            builder.getJavaArguments().addAll(StringUtils.tokenize(launchProfile.getJvmArgs()));
+                        }
+                        if (launchProfile.getGameArgs() != null) {
+                            builder.getGameArguments().addAll(StringUtils.tokenize(launchProfile.getGameArgs()));
+                        }
+                        if (launchProfile.getWidth() != null)
+                            builder.setWidth(launchProfile.getWidth());
+                        if (launchProfile.getHeight() != null)
+                            builder.setHeight(launchProfile.getHeight());
+                        if (launchProfile.getFullscreen() != null)
+                            builder.setFullscreen(launchProfile.getFullscreen());
+                        if (launchProfile.getServerIp() != null)
+                            builder.setServerIp(launchProfile.getServerIp());
+                        if (launchProfile.getJavaDir() != null) {
+                            try {
+                                builder.setJava(JavaManager.getJava(Paths.get(launchProfile.getJavaDir())));
+                            } catch (IOException e) {
+                                LOG.warning("Invalid Java path in launch profile: " + launchProfile.getJavaDir(), e);
+                            }
+                        }
+                        if (launchProfile.getWrapper() != null)
+                            builder.setWrapper(launchProfile.getWrapper());
+                        if (launchProfile.getForceJavaCompat() != null && launchProfile.getForceJavaCompat()) {
+                            builder.getJavaArguments().add("-Djava.net.preferIPv4Stack=true");
+                        }
+                        launchOptions = builder.create();
                     }
 
-                    LaunchOptions launchOptions = launchOptionsBuilder.create();
-
-                    LOG.info("Here's the structure of game mod directory:\n" + FileUtils.printFileStructure(repository.getModsDirectory(selectedVersion), 10));
+                    LOG.info("Here's the structure of game mod directory:\n" + FileUtils.printFileStructure(repository.getModManager(selectedVersion).getModsDirectory(), 10));
 
                     return new HMCLGameLauncher(
                             repository,
@@ -246,6 +259,9 @@ public final class LauncherHelper {
                                     : new HMCLProcessListener(repository, version.get(), authInfo, launchOptions, launchingLatch, gameVersion.isPresent())
                     );
                 }).thenComposeAsync(launcher -> { // launcher is prev task's result
+                    if (containerGameDir != null) {
+                        launcher.setRunDirectoryOverride(containerGameDir);
+                    }
                     if (scriptFile == null) {
                         return Task.supplyAsync(launcher::launch);
                     } else {
@@ -267,18 +283,18 @@ public final class LauncherHelper {
                     } else {
                         runLater(() -> {
                             launchingStepsPane.fireEvent(new DialogCloseEvent());
-                            Controllers.dialog(i18n("version.launch_script.success", FileUtils.getAbsolutePath(scriptFile)));
+                            Controllers.dialog(i18n("version.launch_script.success", scriptFile.getAbsolutePath()));
                         });
                     }
                 }).withFakeProgress(
                         i18n("message.doing"),
                         () -> launchingLatch.getCount() == 0, 6.95
                 ).withStage("launch.state.waiting_launching"))
-                .withStagesHints(
-                        new Task.StagesHint("launch.state.java"),
-                        new Task.StagesHint("launch.state.dependencies", List.of("hmcl.install.assets", "hmcl.install.libraries", "hmcl.modpack.download")),
-                        new Task.StagesHint("launch.state.logging_in"),
-                        new Task.StagesHint("launch.state.waiting_launching"))
+                .withStagesHint(Lang.immutableListOf(
+                        "launch.state.java",
+                        "launch.state.dependencies",
+                        "launch.state.logging_in",
+                        "launch.state.waiting_launching"))
                 .executor();
         launchingStepsPane.setExecutor(executor, false);
         executor.addTaskListener(new TaskListener() {
@@ -350,13 +366,13 @@ public final class LauncherHelper {
                                     message = i18n("launch.failed.command_too_long");
                                 } else if (ex instanceof ExecutionPolicyLimitException) {
                                     Controllers.prompt(new PromptDialogPane.Builder(i18n("launch.failed.execution_policy"),
-                                            (result, handler) -> {
+                                            (result, resolve, reject) -> {
                                                 if (CommandBuilder.setExecutionPolicy()) {
                                                     LOG.info("Set the ExecutionPolicy for the scope 'CurrentUser' to 'RemoteSigned'");
-                                                    handler.resolve();
+                                                    resolve.run();
                                                 } else {
                                                     LOG.warning("Failed to set ExecutionPolicy");
-                                                    handler.reject(i18n("launch.failed.execution_policy.failed_to_set"));
+                                                    reject.accept(i18n("launch.failed.execution_policy.failed_to_set"));
                                                 }
                                             })
                                             .addQuestion(new PromptDialogPane.Builder.HintQuestion(i18n("launch.failed.execution_policy.hint")))
@@ -382,7 +398,7 @@ public final class LauncherHelper {
         executor.start();
     }
 
-    private static Task<JavaRuntime> checkGameState(Profile profile, GameSettings.Effective setting, Version version) {
+    private static Task<JavaRuntime> checkGameState(Profile profile, VersionSetting setting, Version version) {
         LibraryAnalyzer analyzer = LibraryAnalyzer.analyze(version, profile.getRepository().getGameVersion(version).orElse(null));
         GameVersionNumber gameVersion = GameVersionNumber.asGameVersion(analyzer.getVersion(LibraryAnalyzer.LibraryType.MINECRAFT));
 
@@ -394,10 +410,9 @@ public final class LauncherHelper {
             }
         });
         Task<JavaRuntime> task;
-        JavaVersionType javaVersionType = setting.getInheritable(GameSettings::javaTypeProperty);
-        if (setting.getInheritable(GameSettings::notCheckJVMProperty)) {
+        if (setting.isNotCheckJVM()) {
             task = getJavaTask.thenApplyAsync(java -> Lang.requireNonNullElse(java, JavaRuntime.getDefault()));
-        } else if (javaVersionType == JavaVersionType.AUTO || javaVersionType == JavaVersionType.VERSION) {
+        } else if (setting.getJavaVersionType() == JavaVersionType.AUTO || setting.getJavaVersionType() == JavaVersionType.VERSION) {
             task = getJavaTask.thenComposeAsync(Schedulers.javafx(), java -> {
                 if (java != null) {
                     return Task.completed(java);
@@ -410,21 +425,12 @@ public final class LauncherHelper {
                 List<GameJavaVersion> supportedVersions = GameJavaVersion.getSupportedVersions(SYSTEM_PLATFORM);
 
                 GameJavaVersion targetJavaVersion = null;
-                if (javaVersionType == JavaVersionType.VERSION) {
+                if (setting.getJavaVersionType() == JavaVersionType.VERSION) {
                     try {
-                        int targetJavaVersionMajor = Integer.parseInt(setting.getInheritable(GameSettings::customJavaVersionProperty));
-                        GameJavaVersion minimumJavaVersion = null;
-                        if (gameVersion.compareTo("1.12.2") == 0) {
-                            Optional<String> cleanroomVersion = analyzer.getVersion(LibraryAnalyzer.LibraryType.CLEANROOM);
-                            if (cleanroomVersion.isPresent()) {
-                                minimumJavaVersion = GameJavaVersion.getCleanroomJavaVersion(cleanroomVersion.get());
-                            }
-                        }
+                        int targetJavaVersionMajor = Integer.parseInt(setting.getJavaVersion());
+                        GameJavaVersion minimumJavaVersion = GameJavaVersion.getMinimumJavaVersion(gameVersion);
 
-                        if (minimumJavaVersion == null)
-                            minimumJavaVersion = GameJavaVersion.getMinimumJavaVersion(gameVersion);
-
-                        if (minimumJavaVersion != null && targetJavaVersionMajor < minimumJavaVersion.majorVersion()) {
+                        if (minimumJavaVersion != null && targetJavaVersionMajor < minimumJavaVersion.getMajorVersion()) {
                             Controllers.dialog(
                                     i18n("launch.failed.java_version_too_low"),
                                     i18n("message.error"),
@@ -437,17 +443,8 @@ public final class LauncherHelper {
                         targetJavaVersion = GameJavaVersion.get(targetJavaVersionMajor);
                     } catch (NumberFormatException ignored) {
                     }
-                } else {
-                    if (gameVersion.compareTo("1.12.2") == 0) {
-                        Optional<String> cleanroomVersion = analyzer.getVersion(LibraryAnalyzer.LibraryType.CLEANROOM);
-                        if (cleanroomVersion.isPresent()) {
-                            targetJavaVersion = GameJavaVersion.getCleanroomJavaVersion(cleanroomVersion.get());
-                        }
-                    }
-
-                    if (targetJavaVersion == null)
-                        targetJavaVersion = version.getJavaVersion();
-                }
+                } else
+                    targetJavaVersion = version.getJavaVersion();
 
                 if (targetJavaVersion != null && supportedVersions.contains(targetJavaVersion)) {
                     downloadJava(targetJavaVersion, profile)
@@ -477,7 +474,7 @@ public final class LauncherHelper {
                 if (java != null) {
                     for (JavaVersionConstraint constraint : JavaVersionConstraint.ALL) {
                         if (constraint.appliesToVersion(gameVersion, version, java, analyzer)) {
-                            if (!constraint.checkJava(gameVersion, version, java, analyzer)) {
+                            if (!constraint.checkJava(gameVersion, version, java)) {
                                 if (constraint.isMandatory()) {
                                     violatedMandatoryConstraints.add(constraint);
                                 } else {
@@ -512,14 +509,9 @@ public final class LauncherHelper {
                         return result;
                     } else {
                         GameJavaVersion gameJavaVersion;
-                        if (violatedMandatoryConstraints.contains(JavaVersionConstraint.CLEANROOM)) {
-                            String cleanroomVersion = analyzer.getVersion(LibraryAnalyzer.LibraryType.CLEANROOM)
-                                    .orElse("");
-
-                            gameJavaVersion = !cleanroomVersion.isEmpty()
-                                    ? GameJavaVersion.getCleanroomJavaVersion(cleanroomVersion)
-                                    : GameJavaVersion.JAVA_21;
-                        } else if (violatedMandatoryConstraints.contains(JavaVersionConstraint.GAME_JSON))
+                        if (violatedMandatoryConstraints.contains(JavaVersionConstraint.CLEANROOM_JAVA_21))
+                            gameJavaVersion = GameJavaVersion.JAVA_21;
+                        else if (violatedMandatoryConstraints.contains(JavaVersionConstraint.GAME_JSON))
                             gameJavaVersion = version.getJavaVersion();
                         else if (violatedMandatoryConstraints.contains(JavaVersionConstraint.VANILLA))
                             gameJavaVersion = GameJavaVersion.getMinimumJavaVersion(gameVersion);
@@ -540,7 +532,7 @@ public final class LauncherHelper {
                         }
 
                         if (violatedMandatoryConstraints.contains(JavaVersionConstraint.VANILLA_LINUX_JAVA_8)) {
-                            if (!setting.get(GameSettings::useCustomNativesProperty)) {
+                            if (setting.getNativesDirType() == NativesDirectoryType.VERSION_FOLDER) {
                                 FXUtils.runInFX(() -> Controllers.dialog(i18n("launch.advice.vanilla_linux_java_8"), i18n("message.error"), MessageType.ERROR, breakAction));
                                 return result;
                             } else {
@@ -609,14 +601,9 @@ public final class LauncherHelper {
                         case MODDED_JAVA_21:
                             suggestions.add(i18n("launch.advice.modded_java", 21, gameVersion));
                             break;
-                        case CLEANROOM: {
-                            String cleanroomVersion = analyzer.getVersion(LibraryAnalyzer.LibraryType.CLEANROOM).orElse("");
-                            if (!cleanroomVersion.isEmpty())
-                                suggestions.add(i18n("launch.advice.cleanroom", GameJavaVersion.getCleanroomJavaVersion(cleanroomVersion).majorVersion(), cleanroomVersion));
-                            else
-                                suggestions.add(i18n("launch.advice.cleanroom", 21, ""));
+                        case CLEANROOM_JAVA_21:
+                            suggestions.add(i18n("launch.advice.cleanroom"));
                             break;
-                        }
                         case VANILLA_JAVA_8_51:
                             suggestions.add(i18n("launch.advice.java8_51_1_13"));
                             break;
@@ -624,8 +611,8 @@ public final class LauncherHelper {
                             suggestions.add(i18n("launch.advice.modlauncher8"));
                             break;
                         case VANILLA_X86:
-                            if (!setting.get(GameSettings::useCustomNativesProperty)
-                                    && Platform.isSupportedTranslationX86_64()) {
+                            if (setting.getNativesDirType() == NativesDirectoryType.VERSION_FOLDER
+                                    && isCompatibleWithX86Java()) {
                                 suggestions.add(i18n("launch.advice.vanilla_x86.translation"));
                             }
                             break;
@@ -688,7 +675,7 @@ public final class LauncherHelper {
     private static CompletableFuture<JavaRuntime> downloadJava(GameJavaVersion javaVersion, Profile profile) {
         CompletableFuture<JavaRuntime> future = new CompletableFuture<>();
         Controllers.dialog(new MessageDialogPane.Builder(
-                i18n("launch.advice.require_newer_java_version", javaVersion.majorVersion()),
+                i18n("launch.advice.require_newer_java_version", javaVersion.getMajorVersion()),
                 i18n("message.warning"),
                 MessageType.QUESTION)
                 .yesOrNo(() -> {
@@ -711,13 +698,10 @@ public final class LauncherHelper {
         return future;
     }
 
-    private Task<AuthInfo> logIn(Account account) {
+    private static Task<AuthInfo> logIn(Account account) {
         return Task.composeAsync(() -> {
             try {
-                if (disableOfflineSkin && account instanceof OfflineAccount offlineAccount)
-                    return Task.completed(offlineAccount.logInWithoutSkin());
-                else
-                    return Task.completed(account.logIn());
+                return Task.completed(account.logIn());
             } catch (CredentialExpiredException e) {
                 LOG.info("Credential has expired", e);
 
@@ -754,6 +738,7 @@ public final class LauncherHelper {
     private void checkExit() {
         switch (launcherVisibility) {
             case HIDE_AND_REOPEN:
+                TrayManager.removeTrayIcon();
                 runLater(() -> {
                     Optional.ofNullable(Controllers.getStage())
                             .ifPresent(Stage::show);
@@ -775,16 +760,6 @@ public final class LauncherHelper {
         }
     }
 
-    private void enableAutoAgentForCurrentSetting() {
-        GameSettings.Instance instance = setting.getInstance();
-        if (instance != null
-                && instance.getOverrideProperties().contains(GameSettings.PROPERTY_ALLOW_AUTO_AGENT)) {
-            instance.allowAutoAgentProperty().setValue(true);
-        } else {
-            setting.getPreset().allowAutoAgentProperty().setValue(true);
-        }
-    }
-
     /**
      * The managed process listener.
      * Guarantee that one [JavaProcess], one [HMCLProcessListener].
@@ -792,7 +767,6 @@ public final class LauncherHelper {
      */
     private final class HMCLProcessListener implements ProcessListener {
 
-        private final ReentrantLock lock = new ReentrantLock();
         private final HMCLGameRepository repository;
         private final Version version;
         private final LaunchOptions launchOptions;
@@ -893,6 +867,7 @@ public final class LauncherHelper {
                         // these codes will be executed.
                         if (Controllers.getStage() != null) {
                             Controllers.getStage().hide();
+                            TrayManager.initialize(Controllers.getStage());
                             launchingLatch.countDown();
                         }
                     });
@@ -936,27 +911,24 @@ public final class LauncherHelper {
                     level = Lang.requireNonNullElse(Log4jLevel.guessLevel(log), Log4jLevel.INFO);
                 logBuffer.add(new Log(log, level));
             } else {
-                lock.lock();
-                try {
+                synchronized (this) {
                     logs.addLast(new Log(log, level));
                     if (logs.size() > Log.getLogLines())
                         logs.removeFirst();
-                } finally {
-                    lock.unlock();
                 }
             }
 
             if (!lwjgl) {
                 String lowerCaseLog = log.toLowerCase(Locale.ROOT);
                 if (!detectWindow || lowerCaseLog.contains("lwjgl version") || lowerCaseLog.contains("lwjgl openal")) {
-                    lock.lock();
-                    try {
+                    synchronized (this) {
                         if (!lwjgl) {
                             lwjgl = true;
+                            if (ConfigHolder.config().isDiscordRpcEnabled()) {
+                                DiscordRPCService.getInstance().updatePresenceAsync("Jugando a Minecraft", "En una partida", true);
+                            }
                             finishLaunch();
                         }
-                    } finally {
-                        lock.unlock();
                     }
                 }
             }
@@ -964,6 +936,10 @@ public final class LauncherHelper {
 
         @Override
         public void onExit(int exitCode, ExitType exitType) {
+            if (ConfigHolder.config().isDiscordRpcEnabled()) {
+                DiscordRPCService.getInstance().updatePresenceAsync("En el men\u00fa principal", "Listo para jugar", false);
+            }
+
             if (showLogs) {
                 logBuffer.add(new Log(String.format("[HMCL ProcessListener] Minecraft exit with code %d(0x%x), type is %s.", exitCode, exitCode, exitType), Log4jLevel.INFO));
                 submitLogThread.interrupt();
@@ -981,12 +957,9 @@ public final class LauncherHelper {
 
             // Game crashed before opening the game window.
             if (!lwjgl) {
-                lock.lock();
-                try {
+                synchronized (this) {
                     if (!lwjgl)
                         finishLaunch();
-                } finally {
-                    lock.unlock();
                 }
             }
 
@@ -1000,15 +973,7 @@ public final class LauncherHelper {
 
     }
 
-    private static final Queue<WeakReference<ManagedProcess>> PROCESSES = new ConcurrentLinkedQueue<>();
-
-    public static int countMangedProcesses() {
-        PROCESSES.removeIf(it -> {
-            ManagedProcess process = it.get();
-            return process == null || !process.isRunning();
-        });
-        return PROCESSES.size();
-    }
+    public static final Queue<WeakReference<ManagedProcess>> PROCESSES = new ConcurrentLinkedQueue<>();
 
     public static void stopManagedProcesses() {
         while (!PROCESSES.isEmpty())

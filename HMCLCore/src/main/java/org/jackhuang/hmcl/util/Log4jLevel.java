@@ -17,6 +17,8 @@
  */
 package org.jackhuang.hmcl.util;
 
+import javafx.scene.paint.Color;
+
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -25,22 +27,28 @@ import java.util.regex.Pattern;
  * @author huangyuhui
  */
 public enum Log4jLevel {
-    FATAL(1),
-    ERROR(2),
-    WARN(3),
-    INFO(4),
-    DEBUG(5),
-    TRACE(6),
-    ALL(2147483647);
+    FATAL(1, Color.web("#F7A699")),
+    ERROR(2, Color.web("#FFCCBB")),
+    WARN(3, Color.web("#FFEECC")),
+    INFO(4, Color.web("#FBFBFB")),
+    DEBUG(5, Color.web("#EEE9E0")),
+    TRACE(6, Color.BLUE),
+    ALL(2147483647, Color.BLACK);
 
     private final int level;
+    private final Color color;
 
-    Log4jLevel(int level) {
+    Log4jLevel(int level, Color color) {
         this.level = level;
+        this.color = color;
     }
 
     public int getLevel() {
         return level;
+    }
+
+    public Color getColor() {
+        return color;
     }
 
     public boolean lessOrEqual(Log4jLevel level) {

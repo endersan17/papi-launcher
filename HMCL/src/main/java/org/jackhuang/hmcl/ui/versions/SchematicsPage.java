@@ -19,15 +19,12 @@ package org.jackhuang.hmcl.ui.versions;
 
 import com.jfoenix.controls.JFXButton;
 import com.jfoenix.controls.JFXDialogLayout;
-import com.jfoenix.controls.JFXListView;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
-import javafx.scene.control.Label;
-import javafx.scene.control.ListCell;
-import javafx.scene.control.Skin;
-import javafx.scene.control.Tooltip;
+import javafx.scene.control.*;
 import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.image.PixelWriter;
 import javafx.scene.image.WritableImage;
 import javafx.scene.layout.BorderPane;
@@ -36,6 +33,7 @@ import javafx.scene.layout.StackPane;
 import javafx.stage.FileChooser;
 import org.jackhuang.hmcl.schematic.LitematicFile;
 import org.jackhuang.hmcl.setting.Profile;
+import org.jackhuang.hmcl.setting.Theme;
 import org.jackhuang.hmcl.task.Schedulers;
 import org.jackhuang.hmcl.task.Task;
 import org.jackhuang.hmcl.ui.*;
@@ -44,15 +42,18 @@ import org.jackhuang.hmcl.util.Lang;
 import org.jackhuang.hmcl.util.StringUtils;
 import org.jackhuang.hmcl.util.i18n.I18n;
 import org.jackhuang.hmcl.util.io.FileUtils;
+import org.jackhuang.hmcl.util.platform.OperatingSystem;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.jackhuang.hmcl.ui.FXUtils.onEscPressed;
@@ -76,8 +77,8 @@ public final class SchematicsPage extends ListPageBase<SchematicsPage.Item> impl
 
     public SchematicsPage() {
         FXUtils.applyDragListener(this,
-                file -> currentDirectory != null && Files.isRegularFile(file) && FileUtils.getName(file).endsWith(".litematic"),
-                this::addFiles
+                file -> currentDirectory != null && file.isFile() && file.getName().endsWith(".litematic"),
+                files -> addFiles(files.stream().map(File::toPath).collect(Collectors.toList()))
         );
     }
 
@@ -146,12 +147,12 @@ public final class SchematicsPage extends ListPageBase<SchematicsPage.Item> impl
 
     public void onAddFiles() {
         FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle(i18n("schematics.add.title"));
+        fileChooser.setTitle(i18n("schematics.add"));
         fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(
-                i18n("extension.schematic"), "*.litematic"));
-        List<Path> files = FileUtils.toPaths(fileChooser.showOpenMultipleDialog(Controllers.getStage()));
+                i18n("schematics"), "*.litematic"));
+        List<File> files = fileChooser.showOpenMultipleDialog(Controllers.getStage());
         if (files != null && !files.isEmpty()) {
-            addFiles(files);
+            addFiles(files.stream().map(File::toPath).collect(Collectors.toList()));
         }
     }
 
@@ -160,24 +161,35 @@ public final class SchematicsPage extends ListPageBase<SchematicsPage.Item> impl
             return;
 
         Path parent = currentDirectory.path;
-        Controllers.prompt(
+        Controllers.dialog(new InputDialogPane(
                 i18n("schematics.create_directory.prompt"),
-                (result, handler) -> {
+                "",
+                (result, resolve, reject) -> {
+                    if (StringUtils.isBlank(result)) {
+                        reject.accept(i18n("schematics.create_directory.failed.empty_name"));
+                        return;
+                    }
+
+                    if (result.contains("/") || result.contains("\\") || !OperatingSystem.isNameValid(result)) {
+                        reject.accept(i18n("schematics.create_directory.failed.invalid_name"));
+                        return;
+                    }
+
                     Path targetDir = parent.resolve(result);
                     if (Files.exists(targetDir)) {
-                        handler.reject(i18n("schematics.create_directory.failed.already_exists"));
+                        reject.accept(i18n("schematics.create_directory.failed.already_exists"));
                         return;
                     }
 
                     try {
                         Files.createDirectories(targetDir);
-                        handler.resolve();
+                        resolve.run();
                         refresh();
                     } catch (IOException e) {
                         LOG.warning("Failed to create directory: " + targetDir, e);
-                        handler.reject(i18n("schematics.create_directory.failed", targetDir));
+                        reject.accept(i18n("schematics.create_directory.failed", targetDir));
                     }
-                }, "", new RequiredValidator(), new Validator(i18n("schematics.create_directory.failed.invalid_name"), FileUtils::isNameValid));
+                }));
     }
 
     private DirItem loadAll(Path dir, @Nullable DirItem parent) {
@@ -213,7 +225,7 @@ public final class SchematicsPage extends ListPageBase<SchematicsPage.Item> impl
         getItems().addAll(item.children);
     }
 
-    abstract sealed class Item implements Comparable<Item> {
+    abstract class Item extends Control implements Comparable<Item> {
 
         boolean isDirectory() {
             return this instanceof DirItem;
@@ -231,7 +243,7 @@ public final class SchematicsPage extends ListPageBase<SchematicsPage.Item> impl
             StackPane icon = new StackPane();
             icon.setPrefSize(size, size);
             icon.setMaxSize(size, size);
-            icon.getChildren().add(getIcon().createIcon(size));
+            icon.getChildren().add(getIcon().createIcon(Theme.blackFill(), size));
             return icon;
         }
 
@@ -249,6 +261,11 @@ public final class SchematicsPage extends ListPageBase<SchematicsPage.Item> impl
                 return Integer.compare(this.order(), o.order());
 
             return this.getName().compareTo(o.getName());
+        }
+
+        @Override
+        protected Skin<?> createDefaultSkin() {
+            return new ItemSkin(this);
         }
     }
 
@@ -351,13 +368,13 @@ public final class SchematicsPage extends ListPageBase<SchematicsPage.Item> impl
 
         @Override
         void onReveal() {
-            FXUtils.openFolder(path);
+            FXUtils.openFolder(path.toFile());
         }
 
         @Override
         void onDelete() {
             try {
-                FileUtils.cleanDirectory(path);
+                FileUtils.cleanDirectory(path.toFile());
                 Files.deleteIfExists(path);
                 refresh();
             } catch (IOException e) {
@@ -425,15 +442,13 @@ public final class SchematicsPage extends ListPageBase<SchematicsPage.Item> impl
             return SVG.SCHEMA;
         }
 
-        public @Nullable Image getImage() {
-            return image;
-        }
-
         Node getIcon(int size) {
             if (image == null) {
                 return super.getIcon(size);
             } else {
-                var imageView = new ImageContainer(size);
+                ImageView imageView = new ImageView();
+                imageView.setFitHeight(size);
+                imageView.setFitWidth(size);
                 imageView.setImage(image);
                 return imageView;
             }
@@ -460,6 +475,10 @@ public final class SchematicsPage extends ListPageBase<SchematicsPage.Item> impl
         }
 
         private final class LitematicInfoDialog extends JFXDialogLayout {
+            {
+                setStyle("-fx-background-color: #0A0A0F;");
+            }
+
             private final ComponentList details;
 
             private void addDetailItem(String key, Object detail) {
@@ -529,111 +548,66 @@ public final class SchematicsPage extends ListPageBase<SchematicsPage.Item> impl
         }
     }
 
-    private static final class Cell extends ListCell<Item> {
+    private static final class ItemSkin extends SkinBase<Item> {
+        public ItemSkin(Item item) {
+            super(item);
 
-        private final RipplerContainer graphics;
-        private final BorderPane root;
-        private final StackPane left;
-        private final TwoLineListItem center;
-        private final HBox right;
-
-        private final ImageContainer iconImageView;
-        private final SVGContainer iconSVGView;
-
-        private final Tooltip tooltip = new Tooltip();
-
-        public Cell() {
-            this.root = new BorderPane();
+            BorderPane root = new BorderPane();
             root.getStyleClass().add("md-list-cell");
             root.setPadding(new Insets(8));
 
             {
-                this.left = new StackPane();
+                StackPane left = new StackPane();
+                left.setMaxSize(32, 32);
+                left.setPrefSize(32, 32);
+                left.getChildren().add(item.getIcon(24));
                 left.setPadding(new Insets(0, 8, 0, 0));
 
-                this.iconImageView = new ImageContainer(32);
-                this.iconSVGView = new SVGContainer(32);
+                Path path = item.getPath();
+                if (path != null) {
+                    FXUtils.installSlowTooltip(left, path.toAbsolutePath().normalize().toString());
+                }
 
                 BorderPane.setAlignment(left, Pos.CENTER);
                 root.setLeft(left);
             }
 
             {
-                this.center = new TwoLineListItem();
-                root.setCenter(center);
-            }
-
-            {
-                this.right = new HBox(8);
-                right.setAlignment(Pos.CENTER_RIGHT);
-
-                JFXButton btnReveal = FXUtils.newToggleButton4(SVG.FOLDER_OPEN);
-                FXUtils.installFastTooltip(btnReveal, i18n("reveal.in_file_manager"));
-                btnReveal.setOnAction(event -> {
-                    Item item = getItem();
-                    if (item != null && !(item instanceof BackItem))
-                        item.onReveal();
-                });
-
-                JFXButton btnDelete = FXUtils.newToggleButton4(SVG.DELETE_FOREVER);
-                btnDelete.setOnAction(event -> {
-                    Item item = getItem();
-                    if (item != null && !(item instanceof BackItem)) {
-                        Controllers.confirm(i18n("button.remove.confirm"), i18n("button.remove"),
-                                item::onDelete, null);
-                    }
-                });
-
-                right.getChildren().setAll(btnReveal, btnDelete);
-            }
-
-            this.graphics = new RipplerContainer(root);
-            FXUtils.onClicked(graphics, () -> {
-                Item item = getItem();
-                if (item != null)
-                    item.onClick();
-            });
-        }
-
-        @Override
-        protected void updateItem(Item item, boolean empty) {
-            super.updateItem(item, empty);
-
-            iconImageView.setImage(null);
-
-            if (empty || item == null) {
-                setGraphic(null);
-                center.setTitle("");
-                center.setSubtitle("");
-            } else {
-                if (item instanceof LitematicFileItem fileItem && fileItem.getImage() != null) {
-                    iconImageView.setImage(fileItem.getImage());
-                    left.getChildren().setAll(iconImageView);
-                } else {
-                    iconSVGView.setIcon(item.getIcon());
-                    left.getChildren().setAll(iconSVGView);
-                }
-
+                TwoLineListItem center = new TwoLineListItem();
                 center.setTitle(item.getName());
                 center.setSubtitle(item.getDescription());
 
-                Path path = item.getPath();
-                if (path != null) {
-                    tooltip.setText(FileUtils.getAbsolutePath(path));
-                    FXUtils.installSlowTooltip(left, tooltip);
-                } else {
-                    tooltip.setText("");
-                    Tooltip.uninstall(left, tooltip);
-                }
-
-                root.setRight(item instanceof BackItem ? null : right);
-
-                setGraphic(graphics);
+                root.setCenter(center);
             }
+
+            if (!(item instanceof BackItem)) {
+                HBox right = new HBox(8);
+                right.setAlignment(Pos.CENTER_RIGHT);
+
+                JFXButton btnReveal = new JFXButton();
+                FXUtils.installFastTooltip(btnReveal, i18n("reveal.in_file_manager"));
+                btnReveal.getStyleClass().add("toggle-icon4");
+                btnReveal.setGraphic(SVG.FOLDER_OPEN.createIcon(Theme.blackFill(), -1));
+                btnReveal.setOnAction(event -> item.onReveal());
+
+                JFXButton btnDelete = new JFXButton();
+                btnDelete.getStyleClass().add("toggle-icon4");
+                btnDelete.setGraphic(SVG.DELETE_FOREVER.createIcon(Theme.blackFill(), -1));
+                btnDelete.setOnAction(event ->
+                        Controllers.confirm(i18n("button.remove.confirm"), i18n("button.remove"),
+                                item::onDelete, null));
+
+                right.getChildren().setAll(btnReveal, btnDelete);
+                root.setRight(right);
+            }
+
+            RipplerContainer container = new RipplerContainer(root);
+            FXUtils.onClicked(container, item::onClick);
+            this.getChildren().add(container);
         }
     }
 
-    private final class SchematicsPageSkin extends ToolbarListPageSkin<Item, SchematicsPage> {
+    private final class SchematicsPageSkin extends ToolbarListPageSkin<SchematicsPage> {
         SchematicsPageSkin() {
             super(SchematicsPage.this);
         }
@@ -645,11 +619,6 @@ public final class SchematicsPage extends ListPageBase<SchematicsPage.Item> impl
                     createToolbarButton2(i18n("schematics.add"), SVG.ADD, skinnable::onAddFiles),
                     createToolbarButton2(i18n("schematics.create_directory"), SVG.CREATE_NEW_FOLDER, skinnable::onCreateDirectory)
             );
-        }
-
-        @Override
-        protected ListCell<Item> createListCell(JFXListView<Item> listView) {
-            return new Cell();
         }
     }
 }

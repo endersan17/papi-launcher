@@ -17,7 +17,6 @@
  */
 package org.jackhuang.hmcl.auth.offline;
 
-import com.google.gson.JsonObject;
 import com.google.gson.annotations.SerializedName;
 import javafx.scene.image.Image;
 import org.jackhuang.hmcl.auth.yggdrasil.TextureModel;
@@ -29,17 +28,20 @@ import org.jackhuang.hmcl.util.StringUtils;
 import org.jackhuang.hmcl.util.gson.JsonUtils;
 import org.jackhuang.hmcl.util.io.FileUtils;
 import org.jackhuang.hmcl.util.io.NetworkUtils;
-import org.jackhuang.hmcl.util.io.UrlResponseInfo;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.http.HttpResponse;
+import java.net.URLConnection;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+
+import static org.jackhuang.hmcl.util.Lang.mapOf;
+import static org.jackhuang.hmcl.util.Lang.tryCast;
+import static org.jackhuang.hmcl.util.Pair.pair;
 
 public class Skin {
 
@@ -202,26 +204,25 @@ public class Skin {
         }
     }
 
-    public void writeStorage(JsonObject storage) {
-        storage.addProperty("type", type.name().toLowerCase(Locale.ROOT));
-        storage.addProperty("cslApi", cslApi);
-        storage.addProperty("textureModel", getTextureModel().modelName);
-        storage.addProperty("localSkinPath", localSkinPath);
-        storage.addProperty("localCapePath", localCapePath);
+    public Map<?, ?> toStorage() {
+        return mapOf(
+                pair("type", type.name().toLowerCase(Locale.ROOT)),
+                pair("cslApi", cslApi),
+                pair("textureModel", getTextureModel().modelName),
+                pair("localSkinPath", localSkinPath),
+                pair("localCapePath", localCapePath)
+        );
     }
 
-    public static Skin fromStorage(JsonObject storage) {
+    public static Skin fromStorage(Map<?, ?> storage) {
         if (storage == null) return null;
 
-        String typeText = JsonUtils.getString(storage, "type");
-        Type type = typeText != null ? Type.fromStorage(typeText) : Type.DEFAULT;
-        if (type == null) {
-            type = Type.DEFAULT;
-        }
-        String cslApi = JsonUtils.getString(storage, "cslApi");
-        String textureModel = JsonUtils.getString(storage, "textureModel", "default");
-        String localSkinPath = JsonUtils.getString(storage, "localSkinPath");
-        String localCapePath = JsonUtils.getString(storage, "localCapePath");
+        Type type = tryCast(storage.get("type"), String.class).flatMap(t -> Optional.ofNullable(Type.fromStorage(t)))
+                .orElse(Type.DEFAULT);
+        String cslApi = tryCast(storage.get("cslApi"), String.class).orElse(null);
+        String textureModel = tryCast(storage.get("textureModel"), String.class).orElse("default");
+        String localSkinPath = tryCast(storage.get("localSkinPath"), String.class).orElse(null);
+        String localCapePath = tryCast(storage.get("localCapePath"), String.class).orElse(null);
 
         return new Skin(type, cslApi, "slim".equals(textureModel) ? TextureModel.SLIM : TextureModel.WIDE, localSkinPath, localCapePath);
     }
@@ -243,14 +244,9 @@ public class Skin {
         }
 
         @Override
-        protected Context getContext(@Nullable HttpResponse<?> response, boolean checkETag, String bmclapiHash) throws IOException {
+        protected Context getContext(URLConnection connection, boolean checkETag, String bmclapiHash) throws IOException {
             return new Context() {
                 final ByteArrayOutputStream baos = new ByteArrayOutputStream();
-
-                @Override
-                public void reset() throws IOException {
-                    baos.reset();
-                }
 
                 @Override
                 public void write(byte[] buffer, int offset, int len) {
@@ -264,7 +260,7 @@ public class Skin {
                     setResult(new ByteArrayInputStream(baos.toByteArray()));
 
                     if (checkETag) {
-                        repository.cacheBytes(UrlResponseInfo.of(response), baos.toByteArray());
+                        repository.cacheBytes(connection, baos.toByteArray());
                     }
                 }
             };

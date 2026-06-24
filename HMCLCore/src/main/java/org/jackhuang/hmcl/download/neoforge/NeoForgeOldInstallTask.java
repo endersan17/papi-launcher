@@ -280,7 +280,7 @@ public class NeoForgeOldInstallTask extends Task<Version> {
             for (Library library : profile.getLibraries()) {
                 Path file = fs.getPath("maven").resolve(library.getPath());
                 if (Files.exists(file)) {
-                    Path dest = gameRepository.getLibraryFile(version, library);
+                    Path dest = gameRepository.getLibraryFile(version, library).toPath();
                     FileUtils.copyFile(file, dest);
                 }
             }
@@ -387,11 +387,11 @@ public class NeoForgeOldInstallTask extends Task<Version> {
         }
 
         vars.put("SIDE", "client");
-        vars.put("MINECRAFT_JAR", FileUtils.getAbsolutePath(gameRepository.getVersionJar(version)));
-        vars.put("MINECRAFT_VERSION", FileUtils.getAbsolutePath(gameRepository.getVersionJar(version)));
-        vars.put("ROOT", FileUtils.getAbsolutePath(gameRepository.getBaseDirectory()));
+        vars.put("MINECRAFT_JAR", gameRepository.getVersionJar(version).getAbsolutePath());
+        vars.put("MINECRAFT_VERSION", gameRepository.getVersionJar(version).getAbsolutePath());
+        vars.put("ROOT", gameRepository.getBaseDirectory().getAbsolutePath());
         vars.put("INSTALLER", installer.toAbsolutePath().toString());
-        vars.put("LIBRARY_DIR", FileUtils.getAbsolutePath(gameRepository.getLibrariesDirectory(version)));
+        vars.put("LIBRARY_DIR", gameRepository.getLibrariesDirectory(version).getAbsolutePath());
 
         updateProgress(0, processors.size());
 
@@ -417,6 +417,6 @@ public class NeoForgeOldInstallTask extends Task<Version> {
 
     @Override
     public void postExecute() throws Exception {
-        FileUtils.deleteDirectory(tempDir);
+        FileUtils.deleteDirectory(tempDir.toFile());
     }
 }

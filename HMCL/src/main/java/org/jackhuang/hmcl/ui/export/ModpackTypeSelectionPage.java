@@ -20,10 +20,10 @@ package org.jackhuang.hmcl.ui.export;
 import com.jfoenix.controls.JFXButton;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.shape.SVGPath;
 import org.jackhuang.hmcl.mod.ModpackExportInfo;
 import org.jackhuang.hmcl.mod.mcbbs.McbbsModpackExportTask;
 import org.jackhuang.hmcl.mod.multimc.MultiMCModpackExportTask;
@@ -33,7 +33,8 @@ import org.jackhuang.hmcl.ui.SVG;
 import org.jackhuang.hmcl.ui.construct.TwoLineListItem;
 import org.jackhuang.hmcl.ui.wizard.WizardController;
 import org.jackhuang.hmcl.ui.wizard.WizardPage;
-import org.jackhuang.hmcl.util.SettingsMap;
+
+import java.util.Map;
 
 import static org.jackhuang.hmcl.ui.export.ModpackInfoPage.MODPACK_INFO_OPTION;
 import static org.jackhuang.hmcl.util.i18n.I18n.i18n;
@@ -77,7 +78,8 @@ public final class ModpackTypeSelectionPage extends VBox implements WizardPage {
         graphic.setMouseTransparent(true);
         graphic.setLeft(new TwoLineListItem(i18n("modpack.type." + type), i18n("modpack.type." + type + ".export")));
 
-        Node arrow = SVG.ARROW_FORWARD.createIcon();
+        SVGPath arrow = new SVGPath();
+        arrow.setContent(SVG.ARROW_FORWARD.getPath());
         BorderPane.setAlignment(arrow, Pos.CENTER);
         graphic.setRight(arrow);
 
@@ -87,7 +89,7 @@ public final class ModpackTypeSelectionPage extends VBox implements WizardPage {
     }
 
     @Override
-    public void cleanup(SettingsMap settings) {
+    public void cleanup(Map<String, Object> settings) {
     }
 
     @Override
@@ -95,7 +97,7 @@ public final class ModpackTypeSelectionPage extends VBox implements WizardPage {
         return i18n("modpack.wizard.step.3.title");
     }
 
-    public static final SettingsMap.Key<String> MODPACK_TYPE = new SettingsMap.Key<>("modpack.type");
+    public static final String MODPACK_TYPE = "modpack.type";
 
     public static final String MODPACK_TYPE_MCBBS = "mcbbs";
     public static final String MODPACK_TYPE_MULTIMC = "multimc";

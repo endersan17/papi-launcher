@@ -174,7 +174,7 @@ public interface TabControl {
         }
     }
 
-    final class Tab<T extends Node> {
+    class Tab<T extends Node> {
         private final StringProperty id = new SimpleStringProperty(this, "id");
         private final StringProperty text = new SimpleStringProperty(this, "text");
         private final ReadOnlyBooleanWrapper selected = new ReadOnlyBooleanWrapper(this, "selected");

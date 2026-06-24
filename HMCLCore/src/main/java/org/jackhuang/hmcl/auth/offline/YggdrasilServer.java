@@ -17,14 +17,13 @@
  */
 package org.jackhuang.hmcl.auth.offline;
 
-import org.glavo.uuid.UUIDs;
 import org.glavo.png.javafx.PNGJavaFXUtils;
 import org.jackhuang.hmcl.auth.yggdrasil.GameProfile;
 import org.jackhuang.hmcl.auth.yggdrasil.TextureModel;
 import org.jackhuang.hmcl.util.KeyUtils;
 import org.jackhuang.hmcl.util.Lang;
-import org.jackhuang.hmcl.util.Pair;
 import org.jackhuang.hmcl.util.gson.JsonUtils;
+import org.jackhuang.hmcl.util.gson.UUIDTypeAdapter;
 import org.jackhuang.hmcl.util.io.HttpServer;
 
 import java.io.ByteArrayInputStream;
@@ -65,8 +64,8 @@ public class YggdrasilServer extends HttpServer {
                         "localhost"
                 )),
                 pair("meta", mapOf(
-                        pair("serverName", "HMCL"),
-                        pair("implementationName", "HMCL"),
+                        pair("serverName", "PAPI LAUNCHER"),
+                        pair("implementationName", "PAPI LAUNCHER"),
                         pair("implementationVersion", "1.0"),
                         pair("feature.non_email_login", true)
                 ))
@@ -113,7 +112,7 @@ public class YggdrasilServer extends HttpServer {
     private Response profile(Request request) {
         String uuid = request.getPathVariables().group("uuid");
 
-        Optional<Character> character = findCharacterByUuid(UUIDs.parse(uuid));
+        Optional<Character> character = findCharacterByUuid(UUIDTypeAdapter.fromString(uuid));
 
         //Workaround for JDK-8138667
         //noinspection OptionalIsPresent
@@ -194,13 +193,13 @@ public class YggdrasilServer extends HttpServer {
 
             Map<String, Object> textureResponse = mapOf(
                     pair("timestamp", System.currentTimeMillis()),
-                    pair("profileId", UUIDs.toCompactString(uuid)),
+                    pair("profileId", uuid),
                     pair("profileName", name),
                     pair("textures", realTextures)
             );
 
             return mapOf(
-                    pair("id", UUIDs.toCompactString(uuid)),
+                    pair("id", uuid),
                     pair("name", name),
                     pair("properties", properties(true,
                             pair("textures", new String(
@@ -233,7 +232,12 @@ public class YggdrasilServer extends HttpServer {
     // === properties ===
 
     @SafeVarargs
-    public static List<?> properties(boolean sign, Pair<String, String>... entries) {
+    public static List<?> properties(Map.Entry<String, String>... entries) {
+        return properties(false, entries);
+    }
+
+    @SafeVarargs
+    public static List<?> properties(boolean sign, Map.Entry<String, String>... entries) {
         return Stream.of(entries)
                 .map(entry -> {
                     LinkedHashMap<String, String> property = new LinkedHashMap<>();
@@ -244,6 +248,7 @@ public class YggdrasilServer extends HttpServer {
                     }
                     return property;
                 })
-                .toList();
+                .collect(Collectors.toList());
     }
+
 }

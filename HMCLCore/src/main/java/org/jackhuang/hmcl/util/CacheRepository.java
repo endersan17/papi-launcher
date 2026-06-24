@@ -23,13 +23,12 @@ import org.jackhuang.hmcl.util.function.ExceptionalSupplier;
 import org.jackhuang.hmcl.util.gson.JsonUtils;
 import org.jackhuang.hmcl.util.io.FileUtils;
 import org.jackhuang.hmcl.util.io.NetworkUtils;
-import org.jackhuang.hmcl.util.io.UrlResponseInfo;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.*;
+import java.net.HttpURLConnection;
 import java.net.URI;
-import java.net.http.HttpRequest;
+import java.net.URLConnection;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
@@ -37,15 +36,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.FileTime;
-import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.BiFunction;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.jackhuang.hmcl.util.gson.JsonUtils.*;
@@ -101,7 +97,7 @@ public class CacheRepository {
     }
 
     protected boolean fileExists(String algorithm, String hash) {
-        if (!DigestUtils.isSha1Digest(hash)) return false;
+        if (hash == null) return false;
         Path file = getFile(algorithm, hash);
         if (Files.exists(file)) {
             try {
@@ -114,23 +110,13 @@ public class CacheRepository {
         }
     }
 
-    private void checkHash(String hash) throws IOException {
-        if (!DigestUtils.isSha1Digest(hash)) {
-            throw new IOException("Not SHA-1 checksum: " + hash);
-        }
-    }
-
     public void tryCacheFile(Path path, String algorithm, String hash) throws IOException {
-        checkHash(hash);
-
         Path cache = getFile(algorithm, hash);
         if (Files.isRegularFile(cache)) return;
         FileUtils.copyFile(path, cache);
     }
 
     public Path cacheFile(Path path, String algorithm, String hash) throws IOException {
-        checkHash(hash);
-
         Path cache = getFile(algorithm, hash);
         FileUtils.copyFile(path, cache);
         return cache;
@@ -164,7 +150,7 @@ public class CacheRepository {
         return cache;
     }
 
-    public Path getCachedRemoteFile(URI uri, boolean checkExpires) throws IOException {
+    public Path getCachedRemoteFile(URI uri) throws IOException {
         lock.readLock().lock();
         ETagItem eTagItem;
         try {
@@ -174,9 +160,6 @@ public class CacheRepository {
         }
         if (eTagItem == null) throw new IOException("Cannot find the URL");
         if (StringUtils.isBlank(eTagItem.hash) || !fileExists(SHA1, eTagItem.hash)) throw new FileNotFoundException();
-        if (checkExpires && System.currentTimeMillis() > eTagItem.expires)
-            throw new CacheExpiredException(eTagItem.expires);
-
         Path file = getFile(SHA1, eTagItem.hash);
         if (Files.getLastModifiedTime(file).toMillis() != eTagItem.localLastModified) {
             String hash = DigestUtils.digestToString(SHA1, file);
@@ -195,35 +178,15 @@ public class CacheRepository {
         }
     }
 
-    public @NotNull Map<String, String> injectConnection(URI uri) {
-        try {
-            uri = NetworkUtils.dropQuery(uri);
-        } catch (IllegalArgumentException e) {
-            return Map.of();
-        }
+    public void injectConnection(HttpURLConnection conn) {
+        conn.setUseCaches(true);
 
-        ETagItem eTagItem;
-        lock.readLock().lock();
+        URI uri;
         try {
-            eTagItem = index.get(uri);
-        } finally {
-            lock.readLock().unlock();
-        }
-        if (eTagItem == null) return Map.of();
-        if (eTagItem.eTag != null)
-            return Map.of("if-none-match", eTagItem.eTag);
-        // if (eTagItem.getRemoteLastModified() != null)
-        //     conn.setRequestProperty("If-Modified-Since", eTagItem.getRemoteLastModified());
-        return Map.of();
-    }
-
-    public void injectConnection(URI uri, HttpRequest.Builder requestBuilder) {
-        try {
-            uri = NetworkUtils.dropQuery(uri);
+            uri = NetworkUtils.dropQuery(NetworkUtils.toURI(conn.getURL()));
         } catch (IllegalArgumentException e) {
             return;
         }
-
         ETagItem eTagItem;
         lock.readLock().lock();
         try {
@@ -233,74 +196,44 @@ public class CacheRepository {
         }
         if (eTagItem == null) return;
         if (eTagItem.eTag != null)
-            requestBuilder.header("if-none-match", eTagItem.eTag);
+            conn.setRequestProperty("If-None-Match", eTagItem.eTag);
         // if (eTagItem.getRemoteLastModified() != null)
         //     conn.setRequestProperty("If-Modified-Since", eTagItem.getRemoteLastModified());
     }
 
-    public Path cacheRemoteFile(UrlResponseInfo info, Path downloaded) throws IOException {
-        return cacheData(info, () -> {
+    public Path cacheRemoteFile(URLConnection connection, Path downloaded) throws IOException {
+        return cacheData(connection, () -> {
             String hash = DigestUtils.digestToString(SHA1, downloaded);
             Path cached = cacheFile(downloaded, SHA1, hash);
             return new CacheResult(hash, cached);
         });
     }
 
-    public Path cacheText(UrlResponseInfo info, String text) throws IOException {
-        return cacheBytes(info, text.getBytes(UTF_8));
+    public Path cacheText(URLConnection connection, String text) throws IOException {
+        return cacheBytes(connection, text.getBytes(UTF_8));
     }
 
-    public Path cacheBytes(UrlResponseInfo info, byte[] bytes) throws IOException {
-        return cacheData(info, () -> {
+    public Path cacheBytes(URLConnection connection, byte[] bytes) throws IOException {
+        return cacheData(connection, () -> {
             String hash = DigestUtils.digestToString(SHA1, bytes);
             Path cached = getFile(SHA1, hash);
-            Files.createDirectories(cached.getParent());
-            Files.write(cached, bytes);
+            FileUtils.writeBytes(cached, bytes);
             return new CacheResult(hash, cached);
         });
     }
 
-    private static final Pattern MAX_AGE = Pattern.compile("(s-maxage|max-age)=(?<time>[0-9]+)");
-
-    private Path cacheData(UrlResponseInfo info, ExceptionalSupplier<CacheResult, IOException> cacheSupplier) throws IOException {
-        String eTag = info.headers().firstValue("etag").orElse(null);
+    private Path cacheData(URLConnection connection, ExceptionalSupplier<CacheResult, IOException> cacheSupplier) throws IOException {
+        String eTag = connection.getHeaderField("ETag");
         if (StringUtils.isBlank(eTag)) return null;
-        URI uri = NetworkUtils.dropQuery(info.uri());
-        long expires = 0L;
-
-        expires:
+        URI uri;
         try {
-            String cacheControl = info.headers().firstValue("cache-control").orElse(null);
-            if (StringUtils.isNotBlank(cacheControl)) {
-                if (cacheControl.contains("no-store"))
-                    return null;
-
-                Matcher matcher = MAX_AGE.matcher(cacheControl);
-                if (matcher.find()) {
-                    long seconds = Long.parseLong(matcher.group("time"));
-                    expires = Instant.now().plusSeconds(seconds).toEpochMilli();
-                    break expires;
-                }
-            }
-
-            String expiresHeader = info.headers().firstValue("expires").orElse(null);
-            if (StringUtils.isNotBlank(expiresHeader)) {
-                expires = ZonedDateTime.parse(expiresHeader.trim(), DateTimeFormatter.RFC_1123_DATE_TIME)
-                        .toInstant().toEpochMilli();
-            }
-        } catch (Throwable e) {
-            LOG.warning("Failed to parse expires time", e);
+            uri = NetworkUtils.dropQuery(NetworkUtils.toURI(connection.getURL()));
+        } catch (IllegalArgumentException e) {
+            throw new IOException(e);
         }
-
-        String lastModified = info.headers().firstValue("last-modified").orElse(null);
-
+        String lastModified = connection.getHeaderField("Last-Modified");
         CacheResult cacheResult = cacheSupplier.get();
-        ETagItem eTagItem = new ETagItem(uri.toString(),
-                eTag,
-                cacheResult.hash,
-                Files.getLastModifiedTime(cacheResult.cachedFile).toMillis(),
-                lastModified,
-                expires);
+        ETagItem eTagItem = new ETagItem(uri.toString(), eTag, cacheResult.hash, Files.getLastModifiedTime(cacheResult.cachedFile).toMillis(), lastModified);
         lock.writeLock().lock();
         try {
             index.compute(uri, updateEntity(eTagItem, true));
@@ -403,26 +336,20 @@ public class CacheRepository {
         private final long localLastModified;
         @SerializedName("remote")
         private final String remoteLastModified;
-        private final long expires;
 
         /**
          * For Gson.
          */
         public ETagItem() {
-            this(null, null, null, 0, null, 0L);
+            this(null, null, null, 0, null);
         }
 
-        public ETagItem(String url, String eTag, String hash, long localLastModified, String remoteLastModified, long expires) {
+        public ETagItem(String url, String eTag, String hash, long localLastModified, String remoteLastModified) {
             this.url = url;
             this.eTag = eTag;
             this.hash = hash;
             this.localLastModified = localLastModified;
             this.remoteLastModified = remoteLastModified;
-            this.expires = expires;
-        }
-
-        public long getExpires() {
-            return expires;
         }
 
         public int compareTo(ETagItem other) {
@@ -440,18 +367,18 @@ public class CacheRepository {
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
-            return o instanceof ETagItem that
-                    && localLastModified == that.localLastModified
-                    && Objects.equals(url, that.url)
-                    && Objects.equals(eTag, that.eTag)
-                    && Objects.equals(hash, that.hash)
-                    && Objects.equals(remoteLastModified, that.remoteLastModified)
-                    && this.expires == that.expires;
+            if (o == null || getClass() != o.getClass()) return false;
+            ETagItem eTagItem = (ETagItem) o;
+            return localLastModified == eTagItem.localLastModified &&
+                    Objects.equals(url, eTagItem.url) &&
+                    Objects.equals(eTag, eTagItem.eTag) &&
+                    Objects.equals(hash, eTagItem.hash) &&
+                    Objects.equals(remoteLastModified, eTagItem.remoteLastModified);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(url, eTag, hash, localLastModified, remoteLastModified, expires);
+            return Objects.hash(url, eTag, hash, localLastModified, remoteLastModified);
         }
 
         @Override
@@ -462,7 +389,6 @@ public class CacheRepository {
                     ", hash='" + hash + '\'' +
                     ", localLastModified=" + localLastModified +
                     ", remoteLastModified='" + remoteLastModified + '\'' +
-                    ", expires=" + expires +
                     ']';
         }
     }
@@ -478,21 +404,4 @@ public class CacheRepository {
     }
 
     public static final String SHA1 = "SHA-1";
-
-    public static class CacheExpiredException extends IOException {
-        private final long expires;
-
-        public CacheExpiredException(long expires) {
-            this.expires = expires;
-        }
-
-        public CacheExpiredException(String message, long expires) {
-            super(message);
-            this.expires = expires;
-        }
-
-        public long getExpires() {
-            return expires;
-        }
-    }
 }

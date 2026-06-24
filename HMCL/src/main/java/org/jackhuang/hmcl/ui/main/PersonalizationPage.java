@@ -17,139 +17,143 @@
  */
 package org.jackhuang.hmcl.ui.main;
 
-import com.jfoenix.controls.*;
+import com.jfoenix.controls.JFXButton;
+import com.jfoenix.controls.JFXComboBox;
+import com.jfoenix.controls.JFXSlider;
+import com.jfoenix.controls.JFXTextField;
 import com.jfoenix.effects.JFXDepthManager;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.beans.binding.StringBinding;
 import javafx.beans.binding.When;
+import javafx.beans.value.ChangeListener;
+import javafx.beans.value.ObservableValue;
+import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Cursor;
 import javafx.scene.control.ColorPicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.effect.DropShadow;
 import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontSmoothingType;
-import org.jackhuang.hmcl.setting.SettingsManager;
-import org.jackhuang.hmcl.setting.BackgroundType;
+import org.jackhuang.hmcl.setting.EnumBackgroundImage;
 import org.jackhuang.hmcl.setting.FontManager;
-import org.jackhuang.hmcl.setting.UserSettings;
-import org.jackhuang.hmcl.theme.ThemeColor;
+import org.jackhuang.hmcl.setting.Theme;
 import org.jackhuang.hmcl.ui.FXUtils;
 import org.jackhuang.hmcl.ui.SVG;
 import org.jackhuang.hmcl.ui.construct.*;
 import org.jackhuang.hmcl.util.Lang;
 import org.jackhuang.hmcl.util.javafx.SafeStringConverter;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Optional;
 
-import static org.jackhuang.hmcl.setting.SettingsManager.settings;
-import static org.jackhuang.hmcl.setting.SettingsManager.userSettings;
+import static org.jackhuang.hmcl.setting.ConfigHolder.config;
+import static org.jackhuang.hmcl.setting.ConfigHolder.globalConfig;
 import static org.jackhuang.hmcl.util.i18n.I18n.i18n;
 
 public class PersonalizationPage extends StackPane {
 
-    private static double snapOpacity(double val) {
+    private final HBox themeCardsContainer = new HBox(10);
+    private Theme selectedTheme = Theme.getTheme();
+
+    private static int snapOpacity(double val) {
         if (val <= 0) {
-            return 0.;
+            return 0;
         } else if (Double.isNaN(val) || val >= 100.) {
-            return 1.;
+            return 100;
         }
 
         int prevTick = (int) (val / 5);
         int prevTickValue = prevTick * 5;
         int nextTickValue = (prevTick + 1) * 5;
 
-        int percent = (val - prevTickValue) > (nextTickValue - val) ? nextTickValue : prevTickValue;
-        return percent / 100.;
+        return (val - prevTickValue) > (nextTickValue - val) ? nextTickValue : prevTickValue;
     }
 
     public PersonalizationPage() {
-        VBox content = new VBox(10);
-        content.setPadding(new Insets(10));
+        VBox content = new VBox(4);
+        content.setPadding(new Insets(4, 8, 8, 8));
         content.setFillWidth(true);
         ScrollPane scrollPane = new ScrollPane(content);
         FXUtils.smoothScrolling(scrollPane);
         scrollPane.setFitToWidth(true);
         getChildren().setAll(scrollPane);
 
+        for (Theme theme : Theme.ALL_THEMES) {
+            themeCardsContainer.getChildren().add(createThemeCard(theme));
+        }
+
         ComponentList themeList = new ComponentList();
         {
-            var brightnessPane = new LineSelectButton<String>();
-            brightnessPane.setTitle(i18n("settings.launcher.brightness"));
-            brightnessPane.setNullSafeConverter(name -> i18n("settings.launcher.brightness." + name));
-            brightnessPane.setItems("auto", "light", "dark");
-            brightnessPane.valueProperty().bindBidirectional(settings().themeBrightnessProperty());
+            VBox themeBlock = new VBox();
+            themeBlock.setSpacing(8);
+            themeBlock.setPadding(new Insets(8, 0, 8, 0));
 
-            themeList.getContent().add(brightnessPane);
-        }
+            Label themeTitle = new Label(i18n("settings.launcher.theme"));
+            themeTitle.setStyle("-fx-font-size: 14px; -fx-text-fill: -papi-text; -fx-font-weight: 700;");
+            themeTitle.setPadding(new Insets(0, 0, 4, 0));
 
-        {
-            BorderPane themePane = new BorderPane();
-            themeList.getContent().add(themePane);
-
-            Label left = new Label(i18n("settings.launcher.theme"));
-            BorderPane.setAlignment(left, Pos.CENTER_LEFT);
-            themePane.setLeft(left);
-
-            StackPane themeColorPickerContainer = new StackPane();
-            themeColorPickerContainer.setMinHeight(30);
-            themePane.setRight(themeColorPickerContainer);
-
-            ColorPicker picker = new JFXColorPicker();
-            picker.getCustomColors().setAll(ThemeColor.STANDARD_COLORS.stream().map(ThemeColor::color).toList());
-            ThemeColor.bindBidirectional(picker, settings().themeColorProperty());
-            themeColorPickerContainer.getChildren().setAll(picker);
-            Platform.runLater(() -> JFXDepthManager.setDepth(picker, 0));
+            themeBlock.getChildren().addAll(themeTitle, themeCardsContainer);
+            themeList.getContent().add(themeBlock);
         }
         {
-            LineToggleButton titleTransparentButton = new LineToggleButton();
+            OptionToggleButton titleTransparentButton = new OptionToggleButton();
             themeList.getContent().add(titleTransparentButton);
-            titleTransparentButton.selectedProperty().bindBidirectional(settings().titleTransparentProperty());
+            titleTransparentButton.selectedProperty().bindBidirectional(config().titleTransparentProperty());
             titleTransparentButton.setTitle(i18n("settings.launcher.title_transparent"));
         }
         {
-            LineToggleButton animationButton = new LineToggleButton();
+            OptionToggleButton animationButton = new OptionToggleButton();
             themeList.getContent().add(animationButton);
-            animationButton.selectedProperty().bindBidirectional(settings().animationDisabledProperty());
+            animationButton.selectedProperty().bindBidirectional(config().animationDisabledProperty());
             animationButton.setTitle(i18n("settings.launcher.turn_off_animations"));
-            animationButton.setSubtitle(i18n("settings.take_effect_after_restart"));
+        }
+        {
+            OptionToggleButton glassButton = new OptionToggleButton();
+            themeList.getContent().add(glassButton);
+            glassButton.selectedProperty().bindBidirectional(config().transparentEffectProperty());
+            glassButton.setTitle(i18n("settings.launcher.glass_effect"));
+            glassButton.setSubtitle(i18n("settings.launcher.glass_effect.subtitle"));
         }
         content.getChildren().addAll(ComponentList.createComponentListTitle(i18n("settings.launcher.appearance")), themeList);
 
         {
             ComponentList componentList = new ComponentList();
 
-            MultiFileItem<BackgroundType> backgroundItem = new MultiFileItem<>();
+            MultiFileItem<EnumBackgroundImage> backgroundItem = new MultiFileItem<>();
             ComponentSublist backgroundSublist = new ComponentSublist();
             backgroundSublist.getContent().add(backgroundItem);
             backgroundSublist.setTitle(i18n("launcher.background"));
             backgroundSublist.setHasSubtitle(true);
 
             backgroundItem.loadChildren(Arrays.asList(
-                    new MultiFileItem.Option<>(i18n("launcher.background.default"), BackgroundType.DEFAULT)
+                    new MultiFileItem.Option<>(i18n("launcher.background.default"), EnumBackgroundImage.DEFAULT)
                             .setTooltip(i18n("launcher.background.default.tooltip")),
-                    new MultiFileItem.Option<>(i18n("launcher.background.classic"), BackgroundType.CLASSIC),
-                    new MultiFileItem.FileOption<>(i18n("settings.custom"), BackgroundType.CUSTOM)
+                    new MultiFileItem.Option<>(i18n("launcher.background.classic"), EnumBackgroundImage.CLASSIC),
+                    new MultiFileItem.FileOption<>(i18n("settings.custom"), EnumBackgroundImage.CUSTOM)
                             .setChooserTitle(i18n("launcher.background.choose"))
                             .addExtensionFilter(FXUtils.getImageExtensionFilter())
-                            .setSelectionMode(FileSelector.SelectionMode.FILE_OR_DIRECTORY)
-                            .bindBidirectional(settings().backgroundImageProperty()),
-                    new MultiFileItem.StringOption<>(i18n("launcher.background.network"), BackgroundType.NETWORK)
+                            .bindBidirectional(config().backgroundImageProperty()),
+                    new MultiFileItem.StringOption<>(i18n("launcher.background.network"), EnumBackgroundImage.NETWORK)
                             .setValidators(new URLValidator(true))
-                            .bindBidirectional(settings().backgroundImageUrlProperty()),
-                    new MultiFileItem.PaintOption<>(i18n("launcher.background.paint"), BackgroundType.PAINT)
-                            .bindBidirectional(settings().backgroundPaintProperty())
+                            .bindBidirectional(config().backgroundImageUrlProperty()),
+                    new MultiFileItem.PaintOption<>(i18n("launcher.background.paint"), EnumBackgroundImage.PAINT)
+                            .bindBidirectional(config().backgroundPaintProperty()),
+                    new MultiFileItem.Option<>(i18n("launcher.background.per_theme"), EnumBackgroundImage.PER_THEME)
+                            .setTooltip(i18n("launcher.background.per_theme.tooltip"))
             ));
-            backgroundItem.selectedDataProperty().bindBidirectional(settings().backgroundTypeProperty());
-            backgroundSublist.descriptionProperty().bind(
-                    new When(backgroundItem.selectedDataProperty().isEqualTo(BackgroundType.DEFAULT))
+            backgroundItem.selectedDataProperty().bindBidirectional(config().backgroundImageTypeProperty());
+            backgroundSublist.subtitleProperty().bind(
+                    new When(backgroundItem.selectedDataProperty().isEqualTo(EnumBackgroundImage.DEFAULT))
                             .then(i18n("launcher.background.default"))
-                            .otherwise(settings().backgroundImageProperty()));
+                            .otherwise(config().backgroundImageProperty()));
 
             HBox opacityItem = new HBox(8);
             {
@@ -157,24 +161,38 @@ public class PersonalizationPage extends StackPane {
 
                 Label label = new Label(i18n("settings.launcher.background.settings.opacity"));
 
-                JFXSlider slider = new JFXSlider(0, 100, settings().backgroundOpacityProperty().get() * 100);
+                JFXSlider slider = new JFXSlider(0, 100,
+                        config().getBackgroundImageType() != EnumBackgroundImage.TRANSLUCENT
+                                ? config().getBackgroundImageOpacity() : 50);
                 slider.setShowTickMarks(true);
                 slider.setMajorTickUnit(10);
                 slider.setMinorTickCount(1);
                 slider.setBlockIncrement(5);
                 slider.setSnapToTicks(true);
-                slider.setPadding(new Insets(9, 0, 0, 0));
                 HBox.setHgrow(slider, Priority.ALWAYS);
 
+                if (config().getBackgroundImageType() == EnumBackgroundImage.TRANSLUCENT) {
+                    slider.setDisable(true);
+                    config().backgroundImageTypeProperty().addListener(new ChangeListener<>() {
+                        @Override
+                        public void changed(ObservableValue<? extends EnumBackgroundImage> observable, EnumBackgroundImage oldValue, EnumBackgroundImage newValue) {
+                            if (newValue != EnumBackgroundImage.TRANSLUCENT) {
+                                config().backgroundImageTypeProperty().removeListener(this);
+                                slider.setDisable(false);
+                                slider.setValue(100);
+                            }
+                        }
+                    });
+                }
+
                 Label textOpacity = new Label();
-                FXUtils.setLimitWidth(textOpacity, 50);
 
                 StringBinding valueBinding = Bindings.createStringBinding(() -> ((int) slider.getValue()) + "%", slider.valueProperty());
                 textOpacity.textProperty().bind(valueBinding);
                 slider.setValueFactory(s -> valueBinding);
 
                 slider.valueProperty().addListener((observable, oldValue, newValue) ->
-                        settings().backgroundOpacityProperty().set(snapOpacity(newValue.doubleValue())));
+                        config().setBackgroundImageOpacity(snapOpacity(newValue.doubleValue())));
 
                 opacityItem.getChildren().setAll(label, slider, textOpacity);
             }
@@ -184,7 +202,8 @@ public class PersonalizationPage extends StackPane {
         }
 
         {
-            ComponentList logPane = new ComponentList();
+            ComponentList logPane = new ComponentSublist();
+            logPane.setTitle(i18n("settings.launcher.log"));
 
             {
                 VBox fontPane = new VBox();
@@ -204,21 +223,16 @@ public class PersonalizationPage extends StackPane {
                         hBox.setSpacing(3);
 
                         FontComboBox cboLogFont = new FontComboBox();
-                        cboLogFont.valueProperty().bindBidirectional(settings().logFontFamilyProperty());
+                        cboLogFont.valueProperty().bindBidirectional(config().fontFamilyProperty());
 
                         JFXTextField txtLogFontSize = new JFXTextField();
                         FXUtils.setLimitWidth(txtLogFontSize, 50);
-                        FXUtils.bind(txtLogFontSize, settings().logFontSizeProperty(), SafeStringConverter.fromFiniteDouble()
+                        FXUtils.bind(txtLogFontSize, config().fontSizeProperty(), SafeStringConverter.fromFiniteDouble()
                                 .restrict(it -> it > 0)
                                 .fallbackTo(12.0)
                                 .asPredicate(Validator.addTo(txtLogFontSize)));
 
-                        JFXButton clearButton = FXUtils.newToggleButton4(SVG.RESTORE);
-                        clearButton.setOnAction(e -> cboLogFont.setValue(null));
-
-                        FXUtils.installFastTooltip(clearButton, i18n("button.reset"));
-
-                        hBox.getChildren().setAll(cboLogFont, txtLogFontSize, clearButton);
+                        hBox.getChildren().setAll(cboLogFont, txtLogFontSize);
 
                         borderPane.setRight(hBox);
                     }
@@ -226,8 +240,8 @@ public class PersonalizationPage extends StackPane {
 
                 Label lblLogFontDisplay = new Label("[23:33:33] [Client Thread/INFO] [WaterPower]: Loaded mod WaterPower.");
                 lblLogFontDisplay.fontProperty().bind(Bindings.createObjectBinding(
-                        () -> Font.font(Lang.requireNonNullElse(settings().logFontFamilyProperty().get(), FXUtils.DEFAULT_MONOSPACE_FONT), settings().logFontSizeProperty().get()),
-                        settings().logFontFamilyProperty(), settings().logFontSizeProperty()));
+                        () -> Font.font(Lang.requireNonNullElse(config().getFontFamily(), FXUtils.DEFAULT_MONOSPACE_FONT), config().getFontSize()),
+                        config().fontFamilyProperty(), config().fontSizeProperty()));
 
                 fontPane.getChildren().add(lblLogFontDisplay);
 
@@ -238,7 +252,8 @@ public class PersonalizationPage extends StackPane {
         }
 
         {
-            ComponentList fontPane = new ComponentList();
+            ComponentSublist fontPane = new ComponentSublist();
+            fontPane.setTitle(i18n("settings.launcher.font"));
 
             {
                 VBox vbox = new VBox();
@@ -258,13 +273,13 @@ public class PersonalizationPage extends StackPane {
                         hBox.setSpacing(8);
 
                         FontComboBox cboFont = new FontComboBox();
-                        cboFont.setValue(settings().launcherFontFamilyProperty().get());
+                        cboFont.setValue(config().getLauncherFontFamily());
                         FXUtils.onChange(cboFont.valueProperty(), FontManager::setFontFamily);
 
-                        JFXButton clearButton = FXUtils.newToggleButton4(SVG.RESTORE);
+                        JFXButton clearButton = new JFXButton();
+                        clearButton.getStyleClass().add("toggle-icon4");
+                        clearButton.setGraphic(SVG.RESTORE.createIcon(Theme.blackFill(), -1));
                         clearButton.setOnAction(e -> cboFont.setValue(null));
-
-                        FXUtils.installFastTooltip(clearButton, i18n("button.reset"));
 
                         hBox.getChildren().setAll(cboFont, clearButton);
 
@@ -278,44 +293,197 @@ public class PersonalizationPage extends StackPane {
             }
 
             {
-                var fontAntiAliasingPane = new LineSelectButton<Optional<FontSmoothingType>>();
-                fontAntiAliasingPane.setTitle(i18n("settings.launcher.font.anti_aliasing"));
-                fontAntiAliasingPane.setSubtitle(i18n("settings.take_effect_after_restart"));
-                fontAntiAliasingPane.setNullSafeConverter(value ->
-                        value.isPresent()
-                                ? i18n("settings.launcher.font.anti_aliasing." + value.get().name().toLowerCase(Locale.ROOT))
-                                : i18n("settings.launcher.font.anti_aliasing.auto")
-                );
-                fontAntiAliasingPane.setItems(
-                        Optional.empty(),
-                        Optional.of(FontSmoothingType.LCD),
-                        Optional.of(FontSmoothingType.GRAY)
-                );
-
-                @Nullable String fontAntiAliasing = SettingsManager.userSettings().fontAntiAliasingProperty().get();
-                if ("lcd".equalsIgnoreCase(fontAntiAliasing)) {
-                    fontAntiAliasingPane.setValue(Optional.of(FontSmoothingType.LCD));
-                } else if ("gray".equalsIgnoreCase(fontAntiAliasing)) {
-                    fontAntiAliasingPane.setValue(Optional.of(FontSmoothingType.GRAY));
-                } else {
-                    fontAntiAliasingPane.setValue(Optional.empty());
-                }
-                fontAntiAliasingPane.setDisable(SettingsManager.isUserSettingsReadOnly());
-
-                FXUtils.onChange(fontAntiAliasingPane.valueProperty(), value ->
+                BorderPane fontAntiAliasingPane = new BorderPane();
                 {
-                    if (SettingsManager.isUserSettingsReadOnly()) {
-                        return;
+                    Label left = new Label(i18n("settings.launcher.font.anti_aliasing"));
+                    BorderPane.setAlignment(left, Pos.CENTER_LEFT);
+                    fontAntiAliasingPane.setLeft(left);
+                }
+
+                {
+                    @SuppressWarnings("unchecked")
+                    JFXComboBox<Optional<FontSmoothingType>> cboAntiAliasing = new JFXComboBox<>(FXCollections.observableArrayList(
+                            Optional.empty(),
+                            Optional.of(FontSmoothingType.LCD),
+                            Optional.of(FontSmoothingType.GRAY)
+                    ));
+                    String fontAntiAliasing = globalConfig().getFontAntiAliasing();
+                    if ("lcd".equalsIgnoreCase(fontAntiAliasing)) {
+                        cboAntiAliasing.setValue(Optional.of(FontSmoothingType.LCD));
+                    } else if ("gray".equalsIgnoreCase(fontAntiAliasing)) {
+                        cboAntiAliasing.setValue(Optional.of(FontSmoothingType.GRAY));
+                    } else {
+                        cboAntiAliasing.setValue(Optional.empty());
                     }
-                    UserSettings userSettings = userSettings();
-                    userSettings.fontAntiAliasingProperty().set(value.map(it -> it.name().toLowerCase(Locale.ROOT))
-                                            .orElse(null));
-                });
+                    cboAntiAliasing.setConverter(FXUtils.stringConverter(value -> {
+                        if (value.isPresent()) {
+                            return i18n("settings.launcher.font.anti_aliasing." + value.get().name().toLowerCase(Locale.ROOT));
+                        } else {
+                            return i18n("settings.launcher.font.anti_aliasing.auto");
+                        }
+                    }));
+                    FXUtils.onChange(cboAntiAliasing.valueProperty(), value ->
+                            globalConfig().setFontAntiAliasing(value.map(it -> it.name().toLowerCase(Locale.ROOT))
+                                    .orElse(null)));
+
+                    fontAntiAliasingPane.setRight(cboAntiAliasing);
+                }
 
                 fontPane.getContent().add(fontAntiAliasingPane);
             }
 
             content.getChildren().addAll(ComponentList.createComponentListTitle(i18n("settings.launcher.font")), fontPane);
+        }
+    }
+
+    private VBox createThemeCard(Theme theme) {
+        VBox card = new VBox();
+        card.setSpacing(8);
+        card.setAlignment(Pos.CENTER);
+        card.setCursor(Cursor.HAND);
+        card.setUserData(theme);
+
+        Rectangle preview = new Rectangle(60, 36);
+        preview.setArcWidth(8);
+        preview.setArcHeight(8);
+        preview.setFill(Color.web(theme.getColor()));
+
+        Rectangle previewBorder = new Rectangle(60, 36);
+        previewBorder.setArcWidth(8);
+        previewBorder.setArcHeight(8);
+        previewBorder.setFill(Color.TRANSPARENT);
+        previewBorder.setStroke(Color.web(theme.getColor()));
+        previewBorder.setStrokeWidth(1);
+        previewBorder.setOpacity(0.5);
+
+        StackPane previewContainer = new StackPane();
+        previewContainer.getChildren().addAll(preview, previewBorder);
+
+        Label nameLabel = new Label(theme.getDisplayName());
+        nameLabel.setStyle(
+            "-fx-font-size: 11px;" +
+            "-fx-font-weight: 600;" +
+            "-fx-wrap-text: true;" +
+            "-fx-text-alignment: center;"
+        );
+        nameLabel.setMaxWidth(90);
+        nameLabel.setAlignment(Pos.CENTER);
+
+        card.getProperties().put("label", nameLabel);
+        card.getChildren().addAll(previewContainer, nameLabel);
+
+        if (theme.equals(selectedTheme)) {
+            applySelectedStyle(card, theme);
+        } else {
+            applyDefaultStyle(card);
+        }
+
+        card.setOnMouseEntered(e -> {
+            if (!theme.equals(selectedTheme)) {
+                card.setStyle(
+                    "-fx-background-color: rgba(255, 255, 255, 0.05);" +
+                    "-fx-border-color: rgba(255, 255, 255, 0.25);" +
+                    "-fx-border-width: 2px;" +
+                    "-fx-border-radius: 16px;" +
+                    "-fx-background-radius: 16px;" +
+                    "-fx-padding: 14px 12px 12px 12px;" +
+                    "-fx-min-width: 110px;" +
+                    "-fx-max-width: 110px;" +
+                    "-fx-effect: dropshadow(one-pass, rgba(0, 0, 0, 0.4), 12, 0, 0, 6);"
+                );
+            }
+        });
+
+        card.setOnMouseExited(e -> {
+            if (!theme.equals(selectedTheme)) {
+                applyDefaultStyle(card);
+            }
+        });
+
+        card.setOnMouseClicked(e -> selectTheme(theme));
+
+        return card;
+    }
+
+    private void selectTheme(Theme theme) {
+        Theme previousTheme = selectedTheme;
+        selectedTheme = theme;
+
+        for (javafx.scene.Node node : themeCardsContainer.getChildren()) {
+            if (node instanceof VBox) {
+                VBox card = (VBox) node;
+                Theme cardTheme = (Theme) card.getUserData();
+                if (cardTheme.equals(theme)) {
+                    applySelectedStyle(card, cardTheme);
+                } else {
+                    applyDefaultStyle(card);
+                }
+            }
+        }
+
+        if (previousTheme != theme) {
+            config().setTheme(theme);
+        }
+    }
+
+    private void applySelectedStyle(VBox card, Theme theme) {
+        int r = (int)(theme.getPaint().getRed() * 255);
+        int g = (int)(theme.getPaint().getGreen() * 255);
+        int b = (int)(theme.getPaint().getBlue() * 255);
+        String color = theme.getColor();
+
+        card.setStyle(
+            "-fx-background-color: rgba(" + r + ", " + g + ", " + b + ", 0.15);" +
+            "-fx-border-color: " + color + ";" +
+            "-fx-border-width: 2px;" +
+            "-fx-border-radius: 16px;" +
+            "-fx-background-radius: 16px;" +
+            "-fx-padding: 14px 12px 12px 12px;" +
+            "-fx-min-width: 110px;" +
+            "-fx-max-width: 110px;"
+        );
+
+        DropShadow shadow = new DropShadow();
+        shadow.setRadius(10);
+        shadow.setSpread(0.3);
+        shadow.setColor(theme.getPaint());
+        card.setEffect(shadow);
+
+        Label label = (Label) card.getProperties().get("label");
+        if (label != null) {
+            label.setStyle(
+                "-fx-font-size: 11px;" +
+                "-fx-text-fill: " + color + ";" +
+                "-fx-font-weight: 600;" +
+                "-fx-wrap-text: true;" +
+                "-fx-text-alignment: center;"
+            );
+        }
+    }
+
+    private void applyDefaultStyle(VBox card) {
+        card.setStyle(
+            "-fx-background-color: rgba(30, 30, 45, 0.6);" +
+            "-fx-background-radius: 16px;" +
+            "-fx-border-color: rgba(255, 255, 255, 0.10);" +
+            "-fx-border-width: 2px;" +
+            "-fx-border-radius: 16px;" +
+            "-fx-padding: 14px 12px 12px 12px;" +
+            "-fx-min-width: 110px;" +
+            "-fx-max-width: 110px;" +
+            "-fx-effect: dropshadow(one-pass, rgba(0, 0, 0, 0.3), 8, 0, 0, 4);"
+        );
+        card.setEffect(null);
+
+        Label label = (Label) card.getProperties().get("label");
+        if (label != null) {
+            label.setStyle(
+                "-fx-font-size: 11px;" +
+                "-fx-text-fill: rgba(255, 255, 255, 0.85);" +
+                "-fx-font-weight: 600;" +
+                "-fx-wrap-text: true;" +
+                "-fx-text-alignment: center;"
+            );
         }
     }
 }

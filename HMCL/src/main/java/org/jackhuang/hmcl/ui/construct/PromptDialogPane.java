@@ -73,7 +73,7 @@ public class PromptDialogPane extends DialogPane {
                 if (StringUtils.isNotBlank(question.question.get())) {
                     body.addRow(rowIndex++, new Label(question.question.get()), textField);
                 } else {
-                    GridPane.setColumnSpan(textField, 2);
+                    GridPane.setColumnSpan(textField, 1);
                     body.addRow(rowIndex++, textField);
                 }
                 GridPane.setMargin(textField, new Insets(0, 0, 20, 0));
@@ -96,12 +96,12 @@ public class PromptDialogPane extends DialogPane {
                 if (StringUtils.isNotBlank(question.question.get())) {
                     body.addRow(rowIndex++, new Label(question.question.get()), comboBox);
                 } else {
-                    GridPane.setColumnSpan(comboBox, 2);
+                    GridPane.setColumnSpan(comboBox, 1);
                     body.addRow(rowIndex++, comboBox);
                 }
             } else if (question instanceof Builder.HintQuestion) {
                 HintPane pane = new HintPane();
-                GridPane.setColumnSpan(pane, 2);
+                GridPane.setColumnSpan(pane, 1);
                 pane.textProperty().bind(question.question);
                 body.addRow(rowIndex++, pane);
             }
@@ -117,17 +117,11 @@ public class PromptDialogPane extends DialogPane {
     protected void onAccept() {
         setLoading();
 
-        builder.callback.call(builder.questions, new FutureCallback.ResultHandler() {
-            @Override
-            public void resolve() {
-                future.complete(builder.questions);
-                runInFX(() -> onSuccess());
-            }
-
-            @Override
-            public void reject(String reason) {
-                runInFX(() -> onFailure(reason));
-            }
+        builder.callback.call(builder.questions, () -> {
+            future.complete(builder.questions);
+            runInFX(this::onSuccess);
+        }, msg -> {
+            runInFX(() -> onFailure(msg));
         });
     }
 

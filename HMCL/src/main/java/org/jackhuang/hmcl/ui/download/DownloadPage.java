@@ -25,6 +25,7 @@ import org.jackhuang.hmcl.download.*;
 import org.jackhuang.hmcl.download.game.GameRemoteVersion;
 import org.jackhuang.hmcl.mod.RemoteMod;
 import org.jackhuang.hmcl.mod.curse.CurseForgeRemoteModRepository;
+import org.jackhuang.hmcl.mod.modrinth.ModrinthRemoteModRepository;
 import org.jackhuang.hmcl.setting.DownloadProviders;
 import org.jackhuang.hmcl.setting.Profile;
 import org.jackhuang.hmcl.setting.Profiles;
@@ -35,11 +36,12 @@ import org.jackhuang.hmcl.ui.Controllers;
 import org.jackhuang.hmcl.ui.FXUtils;
 import org.jackhuang.hmcl.ui.SVG;
 import org.jackhuang.hmcl.ui.WeakListenerHolder;
+import org.jackhuang.hmcl.ui.animation.ContainerAnimations;
 import org.jackhuang.hmcl.ui.animation.TransitionPane;
 import org.jackhuang.hmcl.ui.construct.AdvancedListBox;
 import org.jackhuang.hmcl.ui.construct.MessageDialogPane;
+import org.jackhuang.hmcl.ui.construct.TabControl;
 import org.jackhuang.hmcl.ui.construct.TabHeader;
-import org.jackhuang.hmcl.ui.construct.Validator;
 import org.jackhuang.hmcl.ui.decorator.DecoratorAnimatedPage;
 import org.jackhuang.hmcl.ui.decorator.DecoratorPage;
 import org.jackhuang.hmcl.ui.versions.DownloadListPage;
@@ -49,32 +51,21 @@ import org.jackhuang.hmcl.ui.versions.Versions;
 import org.jackhuang.hmcl.ui.wizard.Navigation;
 import org.jackhuang.hmcl.ui.wizard.WizardController;
 import org.jackhuang.hmcl.ui.wizard.WizardProvider;
-import org.jackhuang.hmcl.util.SettingsMap;
 import org.jackhuang.hmcl.util.TaskCancellationAction;
-import org.jackhuang.hmcl.util.io.FileUtils;
+import org.jackhuang.hmcl.util.platform.OperatingSystem;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.Locale;
-import java.util.Set;
+import java.util.Map;
 import java.util.concurrent.CancellationException;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 import static org.jackhuang.hmcl.ui.FXUtils.runInFX;
 import static org.jackhuang.hmcl.util.i18n.I18n.i18n;
-import static org.jackhuang.hmcl.util.logging.Logger.LOG;
 
 public class DownloadPage extends DecoratorAnimatedPage implements DecoratorPage {
-    public static final org.jackhuang.hmcl.ui.versions.DownloadPage.DownloadCallback FOR_MOD =
-            (downloadProvider, profile, version, mod, file) -> download(downloadProvider, profile, version, file, "mods");
-    public static final org.jackhuang.hmcl.ui.versions.DownloadPage.DownloadCallback FOR_RESOURCE_PACK =
-            (downloadProvider, profile, version, mod, file) -> download(downloadProvider, profile, version, file, "resourcepacks");
-    public static final org.jackhuang.hmcl.ui.versions.DownloadPage.DownloadCallback FOR_SHADER =
-            (downloadProvider, profile, version, mod, file) -> download(downloadProvider, profile, version, file, "shaderpacks");
-
     private final ReadOnlyObjectWrapper<DecoratorPage.State> state = new ReadOnlyObjectWrapper<>(DecoratorPage.State.fromTitle(i18n("download"), -1));
     private final TabHeader tab;
     private final TabHeader.Tab<VersionsPage> newGameTab = new TabHeader.Tab<>("newGameTab");
@@ -96,8 +87,8 @@ public class DownloadPage extends DecoratorAnimatedPage implements DecoratorPage
         newGameTab.setNodeSupplier(loadVersionFor(() -> new VersionsPage(versionPageNavigator, i18n("install.installer.choose", i18n("install.installer.game")), "", DownloadProviders.getDownloadProvider(),
                 "game", versionPageNavigator::onGameSelected)));
         modpackTab.setNodeSupplier(loadVersionFor(() -> {
-            DownloadListPage page = HMCLLocalizedDownloadListPage.ofModPack((downloadProvider, profile, __, mod, file) -> {
-                Versions.downloadModpackImpl(downloadProvider, profile, uploadVersion, mod, file);
+            DownloadListPage page = HMCLLocalizedDownloadListPage.ofModPack((profile, __, file) -> {
+                Versions.downloadModpackImpl(profile, uploadVersion, file);
             }, false);
 
             JFXButton installLocalModpackButton = FXUtils.newRaisedButton(i18n("install.modpack"));
@@ -106,29 +97,39 @@ public class DownloadPage extends DecoratorAnimatedPage implements DecoratorPage
             page.getActions().add(installLocalModpackButton);
             return page;
         }));
-        modTab.setNodeSupplier(loadVersionFor(() -> HMCLLocalizedDownloadListPage.ofMod(FOR_MOD, true)));
-        resourcePackTab.setNodeSupplier(loadVersionFor(() -> HMCLLocalizedDownloadListPage.ofResourcePack(FOR_RESOURCE_PACK, true)));
-        shaderTab.setNodeSupplier(loadVersionFor(() -> HMCLLocalizedDownloadListPage.ofShaderPack(FOR_SHADER, true)));
+        modTab.setNodeSupplier(loadVersionFor(() -> HMCLLocalizedDownloadListPage.ofMod((profile, version, file) -> download(profile, version, file, "mods"), true)));
+        resourcePackTab.setNodeSupplier(loadVersionFor(() -> HMCLLocalizedDownloadListPage.ofResourcePack((profile, version, file) -> download(profile, version, file, "resourcepacks"), true)));
+        shaderTab.setNodeSupplier(loadVersionFor(() -> new DownloadListPage(ModrinthRemoteModRepository.SHADER_PACKS, (profile, version, file) -> download(profile, version, file, "shaderpacks"), true)));
         worldTab.setNodeSupplier(loadVersionFor(() -> new DownloadListPage(CurseForgeRemoteModRepository.WORLDS)));
-        tab = new TabHeader(transitionPane, newGameTab, modpackTab, modTab, resourcePackTab, shaderTab, worldTab);
+        tab = new TabHeader(newGameTab, modpackTab, modTab, resourcePackTab, shaderTab, worldTab);
 
         Profiles.registerVersionsListener(this::loadVersions);
 
         tab.select(newGameTab);
+        FXUtils.onChangeAndOperate(tab.getSelectionModel().selectedItemProperty(), newValue -> {
+            transitionPane.setContent(newValue.getNode(), ContainerAnimations.FADE);
+        });
 
         AdvancedListBox sideBar = new AdvancedListBox()
                 .startCategory(i18n("download.game").toUpperCase(Locale.ROOT))
-                .addNavigationDrawerTab(tab, newGameTab, i18n("game"), SVG.STADIA_CONTROLLER, SVG.STADIA_CONTROLLER_FILL)
-                .addNavigationDrawerTab(tab, modpackTab, i18n("modpack"), SVG.PACKAGE2, SVG.PACKAGE2_FILL)
+                .addNavigationDrawerTab(tab, newGameTab, i18n("game"), SVG.STADIA_CONTROLLER)
+                .addNavigationDrawerTab(tab, modpackTab, i18n("modpack"), SVG.PACKAGE2)
                 .startCategory(i18n("download.content").toUpperCase(Locale.ROOT))
-                .addNavigationDrawerTab(tab, modTab, i18n("mods"), SVG.EXTENSION, SVG.EXTENSION_FILL)
+                .addNavigationDrawerTab(tab, modTab, i18n("mods"), SVG.EXTENSION)
                 .addNavigationDrawerTab(tab, resourcePackTab, i18n("resourcepack"), SVG.TEXTURE)
-                .addNavigationDrawerTab(tab, shaderTab, i18n("download.shader"), SVG.WB_SUNNY, SVG.WB_SUNNY_FILL)
+                .addNavigationDrawerTab(tab, shaderTab, i18n("download.shader"), SVG.WB_SUNNY)
                 .addNavigationDrawerTab(tab, worldTab, i18n("world"), SVG.PUBLIC);
         FXUtils.setLimitWidth(sideBar, 200);
         setLeft(sideBar);
 
         setCenter(transitionPane);
+    }
+
+    private void selectTabIfCurseForgeAvailable(TabControl.Tab<?> newTab) {
+        if (CurseForgeRemoteModRepository.isAvailable())
+            tab.select(newTab);
+        else
+            Controllers.dialog(i18n("download.curseforge.unavailable"));
     }
 
     private static <T extends Node> Supplier<T> loadVersionFor(Supplier<T> nodeSupplier) {
@@ -141,29 +142,20 @@ public class DownloadPage extends DecoratorAnimatedPage implements DecoratorPage
         };
     }
 
-    public static void download(DownloadProvider downloadProvider, Profile profile, @Nullable String version, RemoteMod.Version file, String subdirectoryName) {
-        if (version == null) version = Profiles.getSelectedInstance(profile);
+    public static void download(Profile profile, @Nullable String version, RemoteMod.Version file, String subdirectoryName) {
+        if (version == null) version = profile.getSelectedVersion();
 
-        Path runDirectory = profile.getRepository().hasVersion(version) ? profile.getRepository().getRunDirectory(version) : profile.getRepository().getBaseDirectory();
+        Path runDirectory = profile.getRepository().hasVersion(version) ? profile.getRepository().getRunDirectory(version).toPath() : profile.getRepository().getBaseDirectory().toPath();
 
-        Set<String> existingFiles;
-
-        try (var list = Files.list(runDirectory.resolve(subdirectoryName))) {
-            existingFiles = list.map(Path::getFileName)
-                    .map(Path::toString)
-                    .collect(Collectors.toSet());
-        } catch (IOException e) {
-            LOG.warning("Failed to list files in " + runDirectory.resolve(subdirectoryName), e);
-            existingFiles = Set.of();
-        }
-
-        Set<String> finalExistingFiles = existingFiles;
-
-        Controllers.prompt(i18n("archive.file.name"), (result, handler) -> {
+        Controllers.prompt(i18n("archive.file.name"), (result, resolve, reject) -> {
+            if (!OperatingSystem.isNameValid(result)) {
+                reject.accept(i18n("install.new_game.malformed"));
+                return;
+            }
             Path dest = runDirectory.resolve(subdirectoryName).resolve(result);
 
             Controllers.taskDialog(Task.composeAsync(() -> {
-                var task = new FileDownloadTask(downloadProvider.injectURLWithCandidates(file.getFile().getUrl()), dest);
+                var task = new FileDownloadTask(file.getFile().getUrl(), dest);
                 task.setName(file.getName());
                 return task;
             }).whenComplete(Schedulers.javafx(), exception -> {
@@ -177,8 +169,9 @@ public class DownloadPage extends DecoratorAnimatedPage implements DecoratorPage
                     Controllers.showToast(i18n("install.success"));
                 }
             }), i18n("message.downloading"), TaskCancellationAction.NORMAL);
-            handler.resolve();
-        }, file.getFile().getFilename(), new Validator(i18n("install.new_game.malformed"), FileUtils::isNameValidForJar), new Validator(i18n("profile.already_exists"), (it) -> !finalExistingFiles.contains(it)));
+
+            resolve.run();
+        }, file.getFile().getFilename());
 
     }
 
@@ -186,7 +179,7 @@ public class DownloadPage extends DecoratorAnimatedPage implements DecoratorPage
         listenerHolder = new WeakListenerHolder();
         runInFX(() -> {
             if (profile == Profiles.getSelectedProfile()) {
-                listenerHolder.add(FXUtils.onWeakChangeAndOperate(Profiles.selectedInstanceProperty(), version -> {
+                listenerHolder.add(FXUtils.onWeakChangeAndOperate(profile.selectedVersionProperty(), version -> {
                     if (modTab.isInitialized()) {
                         modTab.getNode().loadVersion(profile, null);
                     }
@@ -213,29 +206,24 @@ public class DownloadPage extends DecoratorAnimatedPage implements DecoratorPage
     }
 
     public void showGameDownloads() {
-        tab.select(newGameTab, false);
+        tab.select(newGameTab);
     }
 
     public void showModpackDownloads() {
-        tab.select(modpackTab, false);
-    }
-
-    public DownloadListPage showResourcePackDownloads() {
-        tab.select(resourcePackTab, false);
-        return resourcePackTab.getNode();
+        tab.select(modpackTab);
     }
 
     public DownloadListPage showModDownloads() {
-        tab.select(modTab, false);
+        tab.select(modTab);
         return modTab.getNode();
     }
 
     public void showWorldDownloads() {
-        tab.select(worldTab, false);
+        tab.select(worldTab);
     }
 
     private static final class DownloadNavigator implements Navigation {
-        private final SettingsMap settings = new SettingsMap();
+        private final Map<String, Object> settings = new HashMap<>();
 
         @Override
         public void onStart() {
@@ -272,7 +260,7 @@ public class DownloadPage extends DecoratorAnimatedPage implements DecoratorPage
         }
 
         @Override
-        public SettingsMap getSettings() {
+        public Map<String, Object> getSettings() {
             return settings;
         }
 
@@ -299,41 +287,37 @@ public class DownloadPage extends DecoratorAnimatedPage implements DecoratorPage
         }
 
         @Override
-        public void start(SettingsMap settings) {
-            settings.put(ModpackPage.PROFILE, profile);
+        public void start(Map<String, Object> settings) {
+            settings.put(PROFILE, profile);
             settings.put(LibraryAnalyzer.LibraryType.MINECRAFT.getPatchId(), gameVersion);
         }
 
-        private Task<Void> finishVersionDownloadingAsync(SettingsMap settings) {
+        private Task<Void> finishVersionDownloadingAsync(Map<String, Object> settings) {
             GameBuilder builder = dependencyManager.gameBuilder();
 
             String name = (String) settings.get("name");
             builder.name(name);
             builder.gameVersion(((RemoteVersion) settings.get(LibraryAnalyzer.LibraryType.MINECRAFT.getPatchId())).getGameVersion());
 
-            settings.asStringMap().forEach((key, value) -> {
-                if (!LibraryAnalyzer.LibraryType.MINECRAFT.getPatchId().equals(key)
-                        && value instanceof RemoteVersion remoteVersion)
-                    builder.version(remoteVersion);
-            });
+            for (Map.Entry<String, Object> entry : settings.entrySet())
+                if (!LibraryAnalyzer.LibraryType.MINECRAFT.getPatchId().equals(entry.getKey()) && entry.getValue() instanceof RemoteVersion)
+                    builder.version((RemoteVersion) entry.getValue());
 
-            return builder.buildAsync().whenComplete(any -> {
-                profile.getRepository().refreshVersions();
-                profile.getRepository().applyDefaultIsolationSetting(name);
-            }).thenRunAsync(Schedulers.javafx(), () -> Profiles.setSelectedInstance(profile, name));
+            return builder.buildAsync().whenComplete(any -> profile.getRepository().refreshVersions())
+                    .thenRunAsync(Schedulers.javafx(), () -> profile.setSelectedVersion(name));
         }
 
         @Override
-        public Object finish(SettingsMap settings) {
+        public Object finish(Map<String, Object> settings) {
             settings.put("title", i18n("install.new_game.installation"));
             settings.put("success_message", i18n("install.success"));
-            settings.put(FailureCallback.KEY, (settings1, exception, next) -> UpdateInstallerWizardProvider.alertFailureMessage(exception, next));
+            settings.put("failure_callback", (FailureCallback) (settings1, exception, next) -> UpdateInstallerWizardProvider.alertFailureMessage(exception, next));
 
             return finishVersionDownloadingAsync(settings);
         }
 
         @Override
-        public Node createPage(WizardController controller, int step, SettingsMap settings) {
+        public Node createPage(WizardController controller, int step, Map<String, Object> settings) {
             switch (step) {
                 case 0:
                     return new InstallersPage(controller, profile.getRepository(), ((RemoteVersion) controller.getSettings().get("game")).getGameVersion(), downloadProvider);
@@ -346,5 +330,7 @@ public class DownloadPage extends DecoratorAnimatedPage implements DecoratorPage
         public boolean cancel() {
             return true;
         }
+
+        public static final String PROFILE = "PROFILE";
     }
 }

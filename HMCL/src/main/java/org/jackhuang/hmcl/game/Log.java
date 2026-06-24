@@ -19,18 +19,19 @@ package org.jackhuang.hmcl.game;
 
 import org.jackhuang.hmcl.util.Log4jLevel;
 
-import static org.jackhuang.hmcl.setting.SettingsManager.settings;
+import static org.jackhuang.hmcl.setting.ConfigHolder.config;
 
 public final class Log {
     public static final int DEFAULT_LOG_LINES = 2000;
 
     public static int getLogLines() {
-        Integer lines = settings().logLinesProperty().get();
+        Integer lines = config().getLogLines();
         return lines != null && lines > 0 ? lines : DEFAULT_LOG_LINES;
     }
 
     private final String log;
     private Log4jLevel level;
+    private boolean selected = false;
 
     public Log(String log) {
         this.log = log;
@@ -54,6 +55,14 @@ public final class Log {
             this.level = level;
         }
         return level;
+    }
+
+    public boolean isSelected() {
+        return selected;
+    }
+
+    public void setSelected(boolean selected) {
+        this.selected = selected;
     }
 
     @Override

@@ -17,7 +17,7 @@
  */
 package org.jackhuang.hmcl.auth;
 
-import com.google.gson.JsonObject;
+import java.util.Map;
 
 /**
  *
@@ -77,9 +77,8 @@ public abstract class AccountFactory<T extends Account> {
     /**
      * Create a existing(stored in local files) account.
      *
-     * @param metadata serialized public account metadata.
-     * @param privateData serialized private account data.
+     * @param storage serialized account data.
      * @return account stored in local storage. Credentials may expired, and you should refresh account state later.
      */
-    public abstract T fromStorage(JsonObject metadata, JsonObject privateData);
+    public abstract T fromStorage(Map<Object, Object> storage);
 }

@@ -17,17 +17,13 @@
  */
 package org.jackhuang.hmcl.util.io;
 
-import org.glavo.url.WebURL;
-import org.jackhuang.hmcl.mod.curse.CurseForgeRemoteModRepository;
 import org.jackhuang.hmcl.util.Pair;
 import org.jackhuang.hmcl.util.StringUtils;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.io.*;
 import java.net.*;
 import java.nio.charset.Charset;
-import java.time.Duration;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.regex.Matcher;
@@ -43,13 +39,9 @@ import static org.jackhuang.hmcl.util.logging.Logger.LOG;
  * @author huangyuhui
  */
 public final class NetworkUtils {
-    public static final String USER_AGENT = System.getProperty("http.agent", "HMCL");
-
     public static final String PARAMETER_SEPARATOR = "&";
     public static final String NAME_VALUE_SEPARATOR = "=";
-
-    public static final Duration TIMEOUT = Duration.ofSeconds(30);
-    public static final int TIMEOUT_MILLIS = (int) TIMEOUT.toMillis();
+    public static final int TIME_OUT = 8000;
 
     private NetworkUtils() {
     }
@@ -85,27 +77,6 @@ public final class NetworkUtils {
         StringBuilder sb = new StringBuilder(baseUrl);
         boolean first = true;
         for (Entry<String, String> param : params.entrySet()) {
-            if (param.getValue() == null)
-                continue;
-            if (first) {
-                if (!baseUrl.isEmpty()) {
-                    sb.append('?');
-                }
-                first = false;
-            } else {
-                sb.append(PARAMETER_SEPARATOR);
-            }
-            sb.append(encodeURL(param.getKey()));
-            sb.append(NAME_VALUE_SEPARATOR);
-            sb.append(encodeURL(param.getValue()));
-        }
-        return sb.toString();
-    }
-
-    public static String withQuery(String baseUrl, List<Pair<String, String>> params) {
-        StringBuilder sb = new StringBuilder(baseUrl);
-        boolean first = true;
-        for (Pair<String, String> param : params) {
             if (param.getValue() == null)
                 continue;
             if (first) {
@@ -164,48 +135,25 @@ public final class NetworkUtils {
         }
     }
 
-    private static final Map<String, String> API_KEYS = Map.of(
-            "api.curseforge.com", CurseForgeRemoteModRepository.API_KEY,
-            "edge.forgecdn.net", CurseForgeRemoteModRepository.API_KEY
-    );
-
-    public static java.net.http.HttpRequest.Builder newRequestBuilder(URI uri) {
-        var builder = java.net.http.HttpRequest.newBuilder(uri);
-        var host = uri.getHost();
-        if (host == null) return builder;
-        var apiKey = API_KEYS.get(host.toLowerCase(Locale.ROOT));
-        if (StringUtils.isNotBlank(apiKey))
-            builder.header("x-api-key", apiKey);
-        return builder;
-    }
-
-    public static URLConnection createConnection(WebURL url) throws IOException {
+    public static URLConnection createConnection(URI uri) throws IOException {
         URLConnection connection;
         try {
-            connection = url.toURL().openConnection();
+            connection = uri.toURL().openConnection();
         } catch (IllegalArgumentException | MalformedURLException e) {
             throw new IOException(e);
         }
-        connection.setConnectTimeout(TIMEOUT_MILLIS);
-        connection.setReadTimeout(TIMEOUT_MILLIS);
-        if (connection instanceof HttpURLConnection httpConnection) {
+        connection.setConnectTimeout(TIME_OUT);
+        connection.setReadTimeout(TIME_OUT);
+        if (connection instanceof HttpURLConnection) {
+            var httpConnection = (HttpURLConnection) connection;
             httpConnection.setRequestProperty("Accept-Language", Locale.getDefault().toLanguageTag());
-            httpConnection.setRequestProperty("User-Agent", USER_AGENT);
             httpConnection.setInstanceFollowRedirects(false);
         }
         return connection;
     }
 
-    public static URLConnection createConnection(URI uri) throws IOException {
-        return createConnection(WebURL.of(uri));
-    }
-
-    public static HttpURLConnection createHttpConnection(WebURL url) throws IOException {
-        return (HttpURLConnection) createConnection(url);
-    }
-
     public static HttpURLConnection createHttpConnection(String url) throws IOException {
-        return (HttpURLConnection) createConnection(WebURL.parse(url));
+        return (HttpURLConnection) createConnection(toURI(url));
     }
 
     public static HttpURLConnection createHttpConnection(URI url) throws IOException {
@@ -295,8 +243,8 @@ public final class NetworkUtils {
         int redirect = 0;
         while (true) {
             conn.setUseCaches(useCache);
-            conn.setConnectTimeout(TIMEOUT_MILLIS);
-            conn.setReadTimeout(TIMEOUT_MILLIS);
+            conn.setConnectTimeout(TIME_OUT);
+            conn.setReadTimeout(TIME_OUT);
             conn.setInstanceFollowRedirects(false);
             Map<String, List<String>> properties = conn.getRequestProperties();
             String method = conn.getRequestMethod();
@@ -328,11 +276,7 @@ public final class NetworkUtils {
     }
 
     public static String doGet(URI uri) throws IOException {
-        URLConnection connection = createConnection(uri);
-        if (connection instanceof HttpURLConnection httpURLConnection) {
-            connection = resolveConnection(httpURLConnection);
-        }
-        return readFullyAsString(connection);
+        return readFullyAsString(resolveConnection(createHttpConnection(uri)));
     }
 
     public static String doGet(List<URI> uris) throws IOException {
@@ -461,17 +405,17 @@ public final class NetworkUtils {
 
     /// @throws IllegalArgumentException if the string is not a valid URI
     public static @NotNull URI toURI(@NotNull String uri) {
-        return WebURL.toURI(uri);
-    }
-
-    public static @Nullable URI toURIOrNull(String uri) {
-        if (StringUtils.isNotBlank(uri)) {
-            try {
-                return toURI(uri);
-            } catch (Exception ignored) {
-            }
+        try {
+            return new URI(encodeLocation(uri));
+        } catch (URISyntaxException e) {
+            // Possibly an Internationalized Domain Name (IDN)
+            return URI.create(uri);
         }
-
-        return null;
     }
+
+    public static @NotNull URI toURI(@NotNull URL url) {
+        return toURI(url.toExternalForm());
+    }
+    // ====
+
 }

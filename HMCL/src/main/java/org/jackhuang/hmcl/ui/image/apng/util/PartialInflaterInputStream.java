@@ -287,7 +287,7 @@ public class PartialInflaterInputStream extends FilterInputStream {
      *                  the mark position becomes invalid.
      * @see InputStream#reset()
      */
-    public void mark(int readlimit) {
+    public synchronized void mark(int readlimit) {
     }
 
     /**
@@ -302,7 +302,7 @@ public class PartialInflaterInputStream extends FilterInputStream {
      * @see InputStream#mark(int)
      * @see IOException
      */
-    public void reset() throws IOException {
+    public synchronized void reset() throws IOException {
         throw new IOException("mark/reset not supported");
     }
 }

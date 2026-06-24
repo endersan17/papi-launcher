@@ -17,13 +17,12 @@
  */
 package org.jackhuang.hmcl.ui.main;
 
+import javafx.geometry.Insets;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.VBox;
-import org.jackhuang.hmcl.theme.Themes;
 import org.jackhuang.hmcl.ui.FXUtils;
-import org.jackhuang.hmcl.ui.WeakListenerHolder;
 import org.jackhuang.hmcl.ui.construct.ComponentList;
-import org.jackhuang.hmcl.ui.construct.LineButton;
+import org.jackhuang.hmcl.ui.construct.IconedTwoLineListItem;
 import org.jackhuang.hmcl.ui.construct.SpinnerPane;
 
 import static org.jackhuang.hmcl.util.i18n.I18n.i18n;
@@ -32,54 +31,64 @@ import org.jackhuang.hmcl.Metadata;
 
 public class FeedbackPage extends SpinnerPane {
 
-    private final WeakListenerHolder holder = new WeakListenerHolder();
-
     public FeedbackPage() {
         VBox content = new VBox();
-        content.getStyleClass().add("spinner-pane-content");
+        content.setPadding(new Insets(10));
+        content.setSpacing(10);
+        content.setFillWidth(true);
         ScrollPane scrollPane = new ScrollPane(content);
         scrollPane.setFitToWidth(true);
         FXUtils.smoothScrolling(scrollPane);
         setContent(scrollPane);
 
-        ComponentList groups = new ComponentList();
+        ComponentList papiCommunity = new ComponentList();
         {
-            var users = LineButton.createExternalLinkButton(Metadata.GROUPS_URL);
-            users.setLargeTitle(true);
-            users.setLeading(FXUtils.newBuiltinImage("/assets/img/icon.png"));
-            users.setTitle(i18n("contact.chat.qq_group"));
-            users.setSubtitle(i18n("contact.chat.qq_group.statement"));
+            IconedTwoLineListItem discord = new IconedTwoLineListItem();
+            discord.setImage(FXUtils.newBuiltinImage("/assets/img/discord.png"));
+            discord.setTitle(i18n("feedback.papi_community.discord"));
+            discord.setSubtitle(i18n("feedback.papi_community.discord.statement"));
+            discord.setExternalLink(Metadata.PAPI_DISCORD_URL);
 
-            var discord = LineButton.createExternalLinkButton("https://discord.gg/jVvC7HfM6U");
-            discord.setLargeTitle(true);
-            discord.setLeading(FXUtils.newBuiltinImage("/assets/img/discord.png"));
-            discord.setTitle(i18n("contact.chat.discord"));
-            discord.setSubtitle(i18n("contact.chat.discord.statement"));
+            IconedTwoLineListItem github = new IconedTwoLineListItem();
+            github.setImage(FXUtils.newBuiltinImage("/assets/img/github.png"));
+            github.setTitle(i18n("feedback.papi_community.github"));
+            github.setSubtitle(i18n("feedback.papi_community.github.statement"));
+            github.setExternalLink(Metadata.ISSUES_URL);
 
-            groups.getContent().setAll(users, discord);
+            papiCommunity.getContent().setAll(discord, github);
         }
 
-        ComponentList feedback = new ComponentList();
+        ComponentList hmclCommunity = new ComponentList();
         {
-            var github = LineButton.createExternalLinkButton("https://github.com/HMCL-dev/HMCL/issues/new/choose");
-            github.setLargeTitle(true);
-            github.setTitle(i18n("contact.feedback.github"));
-            github.setSubtitle(i18n("contact.feedback.github.statement"));
+            IconedTwoLineListItem users = new IconedTwoLineListItem();
+            users.setImage(FXUtils.newBuiltinImage("/assets/img/icon-HMCL.png"));
+            users.setTitle(i18n("feedback.hmcl_community.qq_group"));
+            users.setSubtitle(i18n("feedback.hmcl_community.qq_group.statement"));
+            users.setExternalLink(Metadata.GROUPS_URL);
 
-            holder.add(FXUtils.onWeakChangeAndOperate(Themes.darkModeProperty(), darkMode -> {
-                github.setLeading(darkMode
-                        ? FXUtils.newBuiltinImage("/assets/img/github-white.png")
-                        : FXUtils.newBuiltinImage("/assets/img/github.png"));
-            }));
+            IconedTwoLineListItem github = new IconedTwoLineListItem();
+            github.setImage(FXUtils.newBuiltinImage("/assets/img/github.png"));
+            github.setTitle(i18n("feedback.github"));
+            github.setSubtitle(i18n("feedback.github.statement"));
+            github.setExternalLink(Metadata.HMCL_GITHUB_URL + "/issues/new/choose");
 
-            feedback.getContent().setAll(github);
+            IconedTwoLineListItem discord = new IconedTwoLineListItem();
+            discord.setImage(FXUtils.newBuiltinImage("/assets/img/discord.png"));
+            discord.setTitle(i18n("feedback.discord"));
+            discord.setSubtitle(i18n("feedback.discord.statement"));
+            discord.setExternalLink("https://discord.gg/jVvC7HfM6U");
+
+            hmclCommunity.getContent().setAll(users, github, discord);
         }
 
         content.getChildren().addAll(
-                ComponentList.createComponentListTitle(i18n("contact.chat")),
-                groups,
-                ComponentList.createComponentListTitle(i18n("contact.feedback")),
-                feedback
+                ComponentList.createComponentListTitle(i18n("feedback.papi_channel")),
+                papiCommunity,
+                ComponentList.createComponentListTitle(i18n("feedback.hmcl_channel")),
+                hmclCommunity
         );
+
+        this.setContent(content);
     }
+
 }

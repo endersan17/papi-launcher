@@ -1,0 +1,42 @@
+.root {
+    -papi-primary: #FF00AA;
+    -papi-primary-darker: #CC0088;
+    -papi-primary-lighter: #FF4DCC;
+    -papi-bg: #0A0A0A;
+    -papi-surface: rgba(15,15,18,0.72);
+    -papi-overlay: rgba(10,10,15,0.92);
+    -papi-dialog-bg: rgba(10,10,10,0.80);
+    -papi-surface-alt: rgba(10,10,10,0.65);
+    -papi-border: rgba(255,255,255,0.12);
+    -papi-border-subtle: rgba(255,255,255,0.06);
+    -papi-shadow: rgba(0,0,0,0.6);
+    -papi-text: #FFFFFF;
+    -papi-text-secondary: rgba(255,255,255,0.7);
+    -papi-text-tertiary: rgba(255,255,255,0.5);
+    -papi-error: #FF5555;
+    -papi-success: #00B064;
+    -papi-warning: #CC9000;
+    -papi-info: #0080D0;
+    -papi-opacity-bg: 0.82;
+    -papi-opacity-surface: 0.72;
+    -papi-opacity-overlay: 0.92;
+    -papi-primary-alpha-010: rgba(255, 0, 170, 0.10);
+    -papi-primary-alpha-015: rgba(255, 0, 170, 0.15);
+    -papi-primary-alpha-020: rgba(255, 0, 170, 0.20);
+    -papi-primary-alpha-025: rgba(255, 0, 170, 0.25);
+    -papi-primary-alpha-030: rgba(255, 0, 170, 0.30);
+    -papi-primary-alpha-035: rgba(255, 0, 170, 0.35);
+    -papi-primary-alpha-040: rgba(255, 0, 170, 0.40);
+    -papi-primary-alpha-050: rgba(255, 0, 170, 0.50);
+}
+
+.scroll-bar .thumb {
+    -fx-background-color: -papi-primary;
+    -fx-background-radius: 10px;
+}
+.scroll-bar .thumb:hover { -fx-opacity: 0.7; }
+.scroll-bar .thumb:pressed { -fx-background-color: derive(-papi-primary, -20%); }
+
+.rippler-container { -jfx-rippler-fill: rgba(255, 0, 170, 0.35); }
+.jfx-rippler { -jfx-rippler-fill: rgba(255, 0, 170, 0.35); }
+.iconed-item { -jfx-rippler-fill: rgba(255, 0, 170, 0.35); }

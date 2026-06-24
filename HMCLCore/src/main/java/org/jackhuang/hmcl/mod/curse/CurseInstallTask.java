@@ -22,20 +22,18 @@ import org.jackhuang.hmcl.download.DefaultDependencyManager;
 import org.jackhuang.hmcl.download.GameBuilder;
 import org.jackhuang.hmcl.game.DefaultGameRepository;
 import org.jackhuang.hmcl.mod.*;
-import org.jackhuang.hmcl.task.CacheFileTask;
 import org.jackhuang.hmcl.task.Task;
 import org.jackhuang.hmcl.util.StringUtils;
 import org.jackhuang.hmcl.util.gson.JsonUtils;
-import org.jackhuang.hmcl.util.io.FileUtils;
-import org.jackhuang.hmcl.util.io.NetworkUtils;
 
+import java.io.File;
 import java.io.IOException;
-import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.*;
-
-import static org.jackhuang.hmcl.util.logging.Logger.LOG;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Install a downloaded CurseForge modpack.
@@ -46,15 +44,12 @@ public final class CurseInstallTask extends Task<Void> {
 
     private final DefaultDependencyManager dependencyManager;
     private final DefaultGameRepository repository;
-    private final Path zipFile;
+    private final File zipFile;
     private final Modpack modpack;
     private final CurseManifest manifest;
     private final String name;
-    private final String iconUrl;
-    private final Path run;
+    private final File run;
     private final ModpackConfiguration<CurseManifest> config;
-    private String iconExt;
-    private Task<Path> downloadIconTask;
     private final List<Task<?>> dependents = new ArrayList<>(4);
     private final List<Task<?>> dependencies = new ArrayList<>(1);
 
@@ -66,28 +61,27 @@ public final class CurseInstallTask extends Task<Void> {
      * @param manifest          The manifest content of given CurseForge modpack.
      * @param name              the new version name
      */
-    public CurseInstallTask(DefaultDependencyManager dependencyManager, Path zipFile, Modpack modpack, CurseManifest manifest, String name, String iconUrl) {
+    public CurseInstallTask(DefaultDependencyManager dependencyManager, File zipFile, Modpack modpack, CurseManifest manifest, String name) {
         this.dependencyManager = dependencyManager;
         this.zipFile = zipFile;
         this.modpack = modpack;
         this.manifest = manifest;
         this.name = name;
-        this.iconUrl = iconUrl;
         this.repository = dependencyManager.getGameRepository();
         this.run = repository.getRunDirectory(name);
 
-        Path json = repository.getModpackConfiguration(name);
-        if (repository.hasVersion(name) && Files.notExists(json))
+        File json = repository.getModpackConfiguration(name);
+        if (repository.hasVersion(name) && !json.exists())
             throw new IllegalArgumentException("Version " + name + " already exists.");
 
-        GameBuilder builder = dependencyManager.gameBuilder().name(name).gameVersion(manifest.minecraft().gameVersion());
-        for (CurseManifestModLoader modLoader : manifest.minecraft().modLoaders()) {
-            if (modLoader.id().startsWith("forge-")) {
-                builder.version("forge", modLoader.id().substring("forge-".length()));
-            } else if (modLoader.id().startsWith("fabric-")) {
-                builder.version("fabric", modLoader.id().substring("fabric-".length()));
-            } else if (modLoader.id().startsWith("neoforge-")) {
-                builder.version("neoforge", modLoader.id().substring("neoforge-".length()));
+        GameBuilder builder = dependencyManager.gameBuilder().name(name).gameVersion(manifest.getMinecraft().getGameVersion());
+        for (CurseManifestModLoader modLoader : manifest.getMinecraft().getModLoaders()) {
+            if (modLoader.getId().startsWith("forge-")) {
+                builder.version("forge", modLoader.getId().substring("forge-".length()));
+            } else if (modLoader.getId().startsWith("fabric-")) {
+                builder.version("fabric", modLoader.getId().substring("fabric-".length()));
+            } else if (modLoader.getId().startsWith("neoforge-")) {
+                builder.version("neoforge", modLoader.getId().substring("neoforge-".length()));
             }
         }
         dependents.add(builder.buildAsync());
@@ -103,8 +97,8 @@ public final class CurseInstallTask extends Task<Void> {
 
         ModpackConfiguration<CurseManifest> config = null;
         try {
-            if (Files.exists(json)) {
-                config = JsonUtils.fromJsonFile(json, ModpackConfiguration.typeOf(CurseManifest.class));
+            if (json.exists()) {
+                config = JsonUtils.fromJsonFile(json.toPath(), ModpackConfiguration.typeOf(CurseManifest.class));
 
                 if (!CurseModpackProvider.INSTANCE.getName().equals(config.getType()))
                     throw new IllegalArgumentException("Version " + name + " is not a Curse modpack. Cannot update this version.");
@@ -112,17 +106,9 @@ public final class CurseInstallTask extends Task<Void> {
         } catch (JsonParseException | IOException ignore) {
         }
         this.config = config;
-        dependents.add(new ModpackInstallTask<>(zipFile, run, modpack.getEncoding(), Collections.singletonList(manifest.overrides()), any -> true, config).withStage("hmcl.modpack"));
-        dependents.add(new MinecraftInstanceTask<>(zipFile, modpack.getEncoding(), Collections.singletonList(manifest.overrides()), manifest, CurseModpackProvider.INSTANCE, manifest.name(), manifest.version(), repository.getModpackConfiguration(name)).withStage("hmcl.modpack"));
+        dependents.add(new ModpackInstallTask<>(zipFile, run, modpack.getEncoding(), Collections.singletonList(manifest.getOverrides()), any -> true, config).withStage("hmcl.modpack"));
+        dependents.add(new MinecraftInstanceTask<>(zipFile, modpack.getEncoding(), Collections.singletonList(manifest.getOverrides()), manifest, CurseModpackProvider.INSTANCE, manifest.getName(), manifest.getVersion(), repository.getModpackConfiguration(name)).withStage("hmcl.modpack"));
 
-        URI iconUri = NetworkUtils.toURIOrNull(iconUrl);
-        if (iconUri != null) {
-            String ext = FileUtils.getExtension(StringUtils.substringAfter(iconUri.getPath(), '/')).toLowerCase(Locale.ROOT);
-            if (Modpack.SUPPORTED_ICON_EXTS.contains(ext)) {
-                iconExt = ext;
-                dependents.add(downloadIconTask = new CacheFileTask(dependencyManager.getDownloadProvider().injectURLWithCandidates(iconUrl)));
-            }
-        }
         dependencies.add(new CurseCompletionTask(dependencyManager, name, manifest));
     }
 
@@ -140,25 +126,18 @@ public final class CurseInstallTask extends Task<Void> {
     public void execute() throws Exception {
         if (config != null) {
             // For update, remove mods not listed in new manifest
-            for (CurseManifestFile oldCurseManifestFile : config.getManifest().files()) {
-                if (StringUtils.isBlank(oldCurseManifestFile.fileName())) continue;
-                Path oldFile = run.resolve("mods/" + oldCurseManifestFile.fileName());
-                if (Files.notExists(oldFile)) continue;
-                if (manifest.files().stream().noneMatch(oldCurseManifestFile::equals))
-                    Files.deleteIfExists(oldFile);
+            for (CurseManifestFile oldCurseManifestFile : config.getManifest().getFiles()) {
+                if (StringUtils.isBlank(oldCurseManifestFile.getFileName())) continue;
+                File oldFile = new File(run, "mods/" + oldCurseManifestFile.getFileName());
+                if (!oldFile.exists()) continue;
+                if (manifest.getFiles().stream().noneMatch(oldCurseManifestFile::equals))
+                    if (!oldFile.delete())
+                        throw new IOException("Unable to delete mod file " + oldFile);
             }
         }
 
-        Path root = repository.getVersionRoot(name);
+        Path root = repository.getVersionRoot(name).toPath();
         Files.createDirectories(root);
         JsonUtils.writeToJsonFile(root.resolve("manifest.json"), manifest);
-
-        if (iconExt != null && Modpack.SUPPORTED_ICON_NAMES.stream().map(root::resolve).allMatch(Files::notExists)) {
-            try {
-                Files.copy(downloadIconTask.getResult(), root.resolve("icon." + iconExt));
-            } catch (Exception e) {
-                LOG.warning("Failed to copy modpack icon", e);
-            }
-        }
     }
 }

@@ -36,6 +36,7 @@ import org.jackhuang.hmcl.auth.authlibinjector.AuthlibInjectorServer;
 import org.jackhuang.hmcl.auth.microsoft.MicrosoftAccount;
 import org.jackhuang.hmcl.game.TexturesLoader;
 import org.jackhuang.hmcl.setting.Accounts;
+import org.jackhuang.hmcl.setting.Theme;
 import org.jackhuang.hmcl.task.Schedulers;
 import org.jackhuang.hmcl.task.Task;
 import org.jackhuang.hmcl.ui.Controllers;
@@ -95,33 +96,42 @@ public final class AccountListItemSkin extends SkinBase<AccountListItem> {
         spinnerMove.getStyleClass().add("small-spinner-pane");
         btnMove.setOnAction(e -> {
             Account account = skinnable.getAccount();
-            if (!Accounts.canMoveAccount(account)) {
-                Controllers.confirmBackupAndOverwrite(i18n("account.storage.read_only"), () -> {
-                    Accounts.forceOverwriteAccountFiles();
-                    moveAccount(skinnable);
-                });
-                return;
+            Accounts.getAccounts().remove(account);
+            if (account.isPortable()) {
+                account.setPortable(false);
+                if (!Accounts.getAccounts().contains(account))
+                    Accounts.getAccounts().add(account);
+            } else {
+                account.setPortable(true);
+                if (!Accounts.getAccounts().contains(account)) {
+                    int idx = 0;
+                    for (int i = Accounts.getAccounts().size() - 1; i >= 0; i--) {
+                        if (Accounts.getAccounts().get(i).isPortable()) {
+                            idx = i + 1;
+                            break;
+                        }
+                    }
+                    Accounts.getAccounts().add(idx, account);
+                }
             }
-
-            moveAccount(skinnable);
         });
         btnMove.getStyleClass().add("toggle-icon4");
         if (skinnable.getAccount().isPortable()) {
-            btnMove.setGraphic(SVG.PUBLIC.createIcon());
+            btnMove.setGraphic(SVG.PUBLIC.createIcon(Theme.blackFill(), -1));
             FXUtils.installFastTooltip(btnMove, i18n("account.move_to_global"));
         } else {
-            btnMove.setGraphic(SVG.OUTPUT.createIcon());
+            btnMove.setGraphic(SVG.OUTPUT.createIcon(Theme.blackFill(), -1));
             FXUtils.installFastTooltip(btnMove, i18n("account.move_to_portable"));
         }
         spinnerMove.setContent(btnMove);
         right.getChildren().add(spinnerMove);
 
-        JFXButton btnRefresh = FXUtils.newToggleButton4(SVG.REFRESH);
+        JFXButton btnRefresh = new JFXButton();
         SpinnerPane spinnerRefresh = new SpinnerPane();
         spinnerRefresh.getStyleClass().setAll("small-spinner-pane");
         if (skinnable.getAccount() instanceof MicrosoftAccount && Accounts.OAUTH_CALLBACK.getClientId().isEmpty()) {
             btnRefresh.setDisable(true);
-            FXUtils.installFastTooltip(spinnerRefresh, i18n("account.methods.microsoft.snapshot.tooltip"));
+            FXUtils.installFastTooltip(spinnerRefresh, i18n("account.methods.microsoft.snapshot"));
         }
         btnRefresh.setOnAction(e -> {
             spinnerRefresh.showSpinner();
@@ -135,11 +145,13 @@ public final class AccountListItemSkin extends SkinBase<AccountListItem> {
                     })
                     .start();
         });
+        btnRefresh.getStyleClass().add("toggle-icon4");
+        btnRefresh.setGraphic(SVG.REFRESH.createIcon(Theme.blackFill(), -1));
         FXUtils.installFastTooltip(btnRefresh, i18n("button.refresh"));
         spinnerRefresh.setContent(btnRefresh);
         right.getChildren().add(spinnerRefresh);
 
-        JFXButton btnUpload = FXUtils.newToggleButton4(SVG.CHECKROOM);
+        JFXButton btnUpload = new JFXButton();
         SpinnerPane spinnerUpload = new SpinnerPane();
         btnUpload.setOnAction(e -> {
             Task<?> uploadTask = skinnable.uploadSkin();
@@ -150,23 +162,29 @@ public final class AccountListItemSkin extends SkinBase<AccountListItem> {
                         .start();
             }
         });
+        btnUpload.getStyleClass().add("toggle-icon4");
+        btnUpload.setGraphic(SVG.CHECKROOM.createIcon(Theme.blackFill(), -1));
         FXUtils.installFastTooltip(btnUpload, i18n("account.skin.upload"));
         btnUpload.disableProperty().bind(Bindings.not(skinnable.canUploadSkin()));
         spinnerUpload.setContent(btnUpload);
         spinnerUpload.getStyleClass().add("small-spinner-pane");
         right.getChildren().add(spinnerUpload);
 
-        JFXButton btnCopyUUID = FXUtils.newToggleButton4(SVG.CONTENT_COPY);
+        JFXButton btnCopyUUID = new JFXButton();
         SpinnerPane spinnerCopyUUID = new SpinnerPane();
         spinnerCopyUUID.getStyleClass().add("small-spinner-pane");
-        btnCopyUUID.setOnAction(e -> FXUtils.copyText(skinnable.getAccount().getProfileID().toString()));
+        btnUpload.getStyleClass().add("toggle-icon4");
+        btnCopyUUID.setOnAction(e -> FXUtils.copyText(skinnable.getAccount().getUUID().toString()));
+        btnCopyUUID.setGraphic(SVG.CONTENT_COPY.createIcon(Theme.blackFill(), -1));
         FXUtils.installFastTooltip(btnCopyUUID, i18n("account.copy_uuid"));
         spinnerCopyUUID.setContent(btnCopyUUID);
         right.getChildren().add(spinnerCopyUUID);
 
-        JFXButton btnRemove = FXUtils.newToggleButton4(SVG.DELETE_FOREVER);
+        JFXButton btnRemove = new JFXButton();
         btnRemove.setOnAction(e -> Controllers.confirm(i18n("button.remove.confirm"), i18n("button.remove"), skinnable::remove, null));
+        btnRemove.getStyleClass().add("toggle-icon4");
         BorderPane.setAlignment(btnRemove, Pos.CENTER);
+        btnRemove.setGraphic(SVG.DELETE.createIcon(Theme.blackFill(), -1));
         FXUtils.installFastTooltip(btnRemove, i18n("button.delete"));
         right.getChildren().add(btnRemove);
         root.setRight(right);
@@ -176,28 +194,5 @@ public final class AccountListItemSkin extends SkinBase<AccountListItem> {
         JFXDepthManager.setDepth(root, 1);
 
         getChildren().setAll(root);
-    }
-
-    /// Moves the account between local and user account files.
-    private static void moveAccount(AccountListItem skinnable) {
-        Account account = skinnable.getAccount();
-        Accounts.getAccounts().remove(account);
-        if (account.isPortable()) {
-            account.setPortable(false);
-            if (!Accounts.getAccounts().contains(account))
-                Accounts.getAccounts().add(account);
-        } else {
-            account.setPortable(true);
-            if (!Accounts.getAccounts().contains(account)) {
-                int idx = 0;
-                for (int i = Accounts.getAccounts().size() - 1; i >= 0; i--) {
-                    if (Accounts.getAccounts().get(i).isPortable()) {
-                        idx = i + 1;
-                        break;
-                    }
-                }
-                Accounts.getAccounts().add(idx, account);
-            }
-        }
     }
 }

@@ -17,6 +17,7 @@
  */
 package org.jackhuang.hmcl.ui.construct;
 
+import com.jfoenix.controls.JFXRippler;
 import javafx.animation.*;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
@@ -25,82 +26,64 @@ import javafx.beans.property.SimpleObjectProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.css.PseudoClass;
+import javafx.geometry.Insets;
 import javafx.geometry.Side;
 import javafx.scene.Node;
 import javafx.scene.control.*;
-import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.StackPane;
+import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
 import javafx.scene.transform.Rotate;
 import javafx.scene.transform.Scale;
 import javafx.util.Duration;
 import org.jackhuang.hmcl.ui.FXUtils;
-import org.jackhuang.hmcl.ui.animation.ContainerAnimations;
-import org.jackhuang.hmcl.ui.animation.Motion;
-import org.jackhuang.hmcl.ui.animation.TransitionPane;
 import org.jackhuang.hmcl.util.javafx.MappedObservableList;
-import org.jetbrains.annotations.Nullable;
 
 @SuppressWarnings("deprecation")
 public class TabHeader extends Control implements TabControl, PageAware {
 
-    private final TransitionPane contentPane;
-
     public TabHeader(Tab<?>... tabs) {
-        this(null, tabs);
-    }
-
-    public TabHeader(@Nullable TransitionPane contentPane, Tab<?>... tabs) {
-        this.contentPane = contentPane;
-
         getStyleClass().setAll("tab-header");
         if (tabs != null) {
             getTabs().addAll(tabs);
         }
     }
 
-    private final ObservableList<Tab<?>> tabs = FXCollections.observableArrayList();
+    private ObservableList<Tab<?>> tabs = FXCollections.observableArrayList();
+    private ObjectProperty<Side> side = new SimpleObjectProperty<>(Side.TOP);
 
     @Override
     public ObservableList<Tab<?>> getTabs() {
         return tabs;
     }
 
-    private final SingleSelectionModel<Tab<?>> selectionModel = new TabControlSelectionModel(this);
+    private final ObjectProperty<SingleSelectionModel<Tab<?>>> selectionModel = new SimpleObjectProperty<>(this, "selectionModel", new TabControlSelectionModel(this));
 
     public SingleSelectionModel<Tab<?>> getSelectionModel() {
+        return selectionModel.get();
+    }
+
+    public ObjectProperty<SingleSelectionModel<Tab<?>>> selectionModelProperty() {
         return selectionModel;
     }
 
-    public void select(Tab<?> tab) {
-        select(tab, true);
+    public void setSelectionModel(SingleSelectionModel<Tab<?>> selectionModel) {
+        this.selectionModel.set(selectionModel);
     }
 
-    public void select(Tab<?> tab, boolean playAnimation) {
+    public void select(Tab<?> tab) {
         Tab<?> oldTab = getSelectionModel().getSelectedItem();
         if (oldTab != null) {
-            if (oldTab.getNode() instanceof PageAware pageAware) {
-                pageAware.onPageHidden();
+            if (oldTab.getNode() instanceof PageAware) {
+                ((PageAware) oldTab.getNode()).onPageHidden();
             }
         }
 
         tab.initializeIfNeeded();
-        if (tab.getNode() instanceof PageAware pageAware) {
-            pageAware.onPageShown();
+        if (tab.getNode() instanceof PageAware) {
+            ((PageAware) tab.getNode()).onPageShown();
         }
 
         getSelectionModel().select(tab);
-
-        if (contentPane != null) {
-            if (playAnimation && contentPane.getCurrentNode() != null) {
-                contentPane.setContent(tab.getNode(),
-                        ContainerAnimations.SLIDE_UP_FADE_IN,
-                        Motion.MEDIUM4,
-                        Motion.EASE_IN_OUT_CUBIC_EMPHASIZED
-                );
-            } else {
-                contentPane.setContent(tab.getNode(), ContainerAnimations.NONE);
-            }
-        }
     }
 
     @Override
@@ -123,20 +106,18 @@ public class TabHeader extends Control implements TabControl, PageAware {
         }
     }
 
-    private final ObjectProperty<Side> side = new SimpleObjectProperty<>(Side.TOP);
+    /**
+     * The position to place the tabs.
+     */
+    public Side getSide() {
+        return side.get();
+    }
 
     /**
      * The position of the tabs.
      */
     public ObjectProperty<Side> sideProperty() {
         return side;
-    }
-
-    /**
-     * The position to place the tabs.
-     */
-    public Side getSide() {
-        return side.get();
     }
 
     /**
@@ -154,6 +135,8 @@ public class TabHeader extends Control implements TabControl, PageAware {
     public static class TabHeaderSkin extends SkinBase<TabHeader> {
 
         private static final PseudoClass SELECTED_PSEUDOCLASS_STATE = PseudoClass.getPseudoClass("selected");
+
+        private final Color ripplerColor = Color.valueOf("#FFFF8D");
 
         private final HeaderContainer header;
         private boolean isSelectingTab = false;
@@ -187,14 +170,14 @@ public class TabHeader extends Control implements TabControl, PageAware {
             this.selectedTab = control.getSelectionModel().getSelectedItem();
         }
 
-        protected final class HeaderContainer extends StackPane {
+        protected class HeaderContainer extends StackPane {
             private Timeline timeline;
-            private final StackPane selectedTabLine;
-            private final HeadersRegion headersRegion;
-            private final Scale scale = new Scale(1, 1, 0, 0);
-            private final Rotate rotate = new Rotate(0, 0, 1);
-            @SuppressWarnings({"FieldCanBeLocal", "unused"})
-            private final ObservableList<Node> binding;
+            private StackPane selectedTabLine;
+            private HeadersRegion headersRegion;
+            private Scale scale = new Scale(1, 1, 0, 0);
+            private Rotate rotate = new Rotate(0, 0, 1);
+            private double selectedTabLineOffset;
+            private ObservableList<Node> binding;
 
             public HeaderContainer() {
                 getStyleClass().add("tab-header-area");
@@ -210,6 +193,7 @@ public class TabHeader extends Control implements TabControl, PageAware {
                 selectedTabLine.getStyleClass().addAll("tab-selected-line");
                 selectedTabLine.setPrefHeight(2);
                 selectedTabLine.setPrefWidth(2);
+                selectedTabLine.setBackground(new Background(new BackgroundFill(ripplerColor, CornerRadii.EMPTY, Insets.EMPTY)));
                 getChildren().setAll(headersRegion, selectedTabLine);
                 headersRegion.setPickOnBounds(false);
                 headersRegion.prefHeightProperty().bind(heightProperty());
@@ -241,19 +225,20 @@ public class TabHeader extends Control implements TabControl, PageAware {
                 }
             }
 
-            private final class HeadersRegion extends StackPane {
+            private class HeadersRegion extends StackPane {
                 private SideAction action;
                 private final ObjectProperty<Side> side = new SimpleObjectProperty<Side>() {
                     @Override
                     protected void invalidated() {
                         super.invalidated();
 
-                        action = switch (get()) {
-                            case TOP -> new Top();
-                            case BOTTOM -> new Bottom();
-                            case LEFT -> new Left();
-                            case RIGHT -> new Right();
-                        };
+                        switch (get()) {
+                            case TOP: action = new Top(); break;
+                            case BOTTOM: action = new Bottom(); break;
+                            case LEFT: action = new Left(); break;
+                            case RIGHT: action = new Right(); break;
+                            default: throw new InternalError();
+                        }
                     }
                 };
 
@@ -284,7 +269,7 @@ public class TabHeader extends Control implements TabControl, PageAware {
                     action.layoutChildren();
                 }
 
-                private void animateSelectionLine() {
+                protected void animateSelectionLine() {
                     action.animateSelectionLine();
                 }
 
@@ -340,6 +325,7 @@ public class TabHeader extends Control implements TabControl, PageAware {
                         double oldWidth = lineWidth * oldScaleX;
                         double oldTransX = selectedTabLine.getTranslateX();
                         double newScaleX = newWidth * oldScaleX / oldWidth;
+                        selectedTabLineOffset = newTransX;
                         // newTransX += offsetStart * (double)this.direction;
                         double transDiff = newTransX - oldTransX;
                         if (transDiff < 0.0D) {
@@ -393,7 +379,7 @@ public class TabHeader extends Control implements TabControl, PageAware {
                     }
                 }
 
-                private final class Top extends Horizontal {
+                private class Top extends Horizontal {
                     @Override
                     public void layoutChildren() {
                         super.layoutChildren();
@@ -418,7 +404,7 @@ public class TabHeader extends Control implements TabControl, PageAware {
                     }
                 }
 
-                private final class Bottom extends Horizontal {
+                private class Bottom extends Horizontal {
                     @Override
                     public void layoutChildren() {
                         super.layoutChildren();
@@ -479,6 +465,7 @@ public class TabHeader extends Control implements TabControl, PageAware {
                         double oldHeight = lineHeight * oldScaleY;
                         double oldTransY = selectedTabLine.getTranslateY();
                         double newScaleY = newHeight * oldScaleY / oldHeight;
+                        selectedTabLineOffset = newTransY;
                         // newTransY += offsetStart * (double)this.direction;
                         double transDiff = newTransY - oldTransY;
                         if (transDiff < 0.0D) {
@@ -532,7 +519,7 @@ public class TabHeader extends Control implements TabControl, PageAware {
                     }
                 }
 
-                private final class Left extends Vertical {
+                private class Left extends Vertical {
                     @Override
                     public void layoutChildren() {
                         super.layoutChildren();
@@ -556,7 +543,7 @@ public class TabHeader extends Control implements TabControl, PageAware {
                     }
                 }
 
-                private final class Right extends Vertical {
+                private class Right extends Vertical {
                     @Override
                     public void layoutChildren() {
                         super.layoutChildren();
@@ -588,6 +575,7 @@ public class TabHeader extends Control implements TabControl, PageAware {
             private final Tab<?> tab;
             private final Label tabText;
             private final BorderPane inner;
+            private final JFXRippler rippler;
 
             public TabHeaderContainer(Tab<?> tab) {
                 this.tab = tab;
@@ -598,8 +586,9 @@ public class TabHeader extends Control implements TabControl, PageAware {
                 inner = new BorderPane();
                 inner.setCenter(tabText);
                 inner.getStyleClass().add("tab-container");
-                inner.setMouseTransparent(true);
-                RipplerContainer rippler = new RipplerContainer(inner);
+                rippler = new JFXRippler(inner, JFXRippler.RipplerPos.FRONT);
+                rippler.getStyleClass().add("tab-rippler");
+                rippler.setRipplerFill(ripplerColor);
                 getChildren().setAll(rippler);
 
                 FXUtils.onChangeAndOperate(tab.selectedProperty(), selected -> inner.pseudoClassStateChanged(SELECTED_PSEUDOCLASS_STATE, selected));

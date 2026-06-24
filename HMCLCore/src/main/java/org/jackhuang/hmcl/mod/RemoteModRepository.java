@@ -32,7 +32,6 @@ public interface RemoteModRepository {
         MOD,
         MODPACK,
         RESOURCE_PACK,
-        SHADER_PACK,
         WORLD,
         CUSTOMIZATION
     }
@@ -88,20 +87,37 @@ public interface RemoteModRepository {
     SearchResult search(DownloadProvider downloadProvider, String gameVersion, @Nullable Category category, int pageOffset, int pageSize, String searchFilter, SortType sortType, SortOrder sortOrder)
             throws IOException;
 
-    Optional<RemoteMod.Version> getRemoteVersionByLocalFile(Path file) throws IOException;
+    Optional<RemoteMod.Version> getRemoteVersionByLocalFile(LocalModFile localModFile, Path file) throws IOException;
 
-    RemoteMod getModById(DownloadProvider downloadProvider, String id) throws IOException;
-
-    default RemoteMod resolveDependency(DownloadProvider downloadProvider, String id) throws IOException {
-        return getModById(downloadProvider, id);
-    }
+    RemoteMod getModById(String id) throws IOException;
 
     RemoteMod.File getModFile(String modId, String fileId) throws IOException;
 
-    Stream<RemoteMod.Version> getRemoteVersionsById(DownloadProvider downloadProvider, String id) throws IOException;
+    Stream<RemoteMod.Version> getRemoteVersionsById(String id) throws IOException;
 
     Stream<Category> getCategories() throws IOException;
 
-    record Category(Object self, String id, List<Category> subcategories) {
+    class Category {
+        private final Object self;
+        private final String id;
+        private final List<Category> subcategories;
+
+        public Category(Object self, String id, List<Category> subcategories) {
+            this.self = self;
+            this.id = id;
+            this.subcategories = subcategories;
+        }
+
+        public Object getSelf() {
+            return self;
+        }
+
+        public String getId() {
+            return id;
+        }
+
+        public List<Category> getSubcategories() {
+            return subcategories;
+        }
     }
 }

@@ -24,11 +24,12 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Scene;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.paint.Color;
 import javafx.scene.layout.Priority;
-import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextFlow;
@@ -40,25 +41,16 @@ import org.jackhuang.hmcl.launch.ProcessListener;
 import org.jackhuang.hmcl.setting.StyleSheets;
 import org.jackhuang.hmcl.task.Schedulers;
 import org.jackhuang.hmcl.task.Task;
-import org.jackhuang.hmcl.theme.Themes;
-import org.jackhuang.hmcl.ui.construct.MessageDialogPane;
-import org.jackhuang.hmcl.ui.construct.SpinnerPane;
 import org.jackhuang.hmcl.ui.construct.TwoLineListItem;
-import org.jackhuang.hmcl.util.Lang;
-import org.jackhuang.hmcl.util.Log4jLevel;
-import org.jackhuang.hmcl.util.Pair;
-import org.jackhuang.hmcl.util.StringUtils;
-import org.jackhuang.hmcl.util.io.FileUtils;
+import org.jackhuang.hmcl.util.*;
 import org.jackhuang.hmcl.util.logging.Logger;
+import org.jackhuang.hmcl.util.io.FileUtils;
 import org.jackhuang.hmcl.util.platform.*;
 
 import java.io.IOException;
-import java.lang.management.ManagementFactory;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.attribute.FileTime;
-import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -68,9 +60,9 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static org.jackhuang.hmcl.util.DataSizeUnit.MEGABYTES;
+import static org.jackhuang.hmcl.util.logging.Logger.LOG;
 import static org.jackhuang.hmcl.util.Pair.pair;
 import static org.jackhuang.hmcl.util.i18n.I18n.i18n;
-import static org.jackhuang.hmcl.util.logging.Logger.LOG;
 
 public class GameCrashWindow extends Stage {
     private final Version version;
@@ -87,13 +79,10 @@ public class GameCrashWindow extends Stage {
     private final ProcessListener.ExitType exitType;
     private final LaunchOptions launchOptions;
     private final View view;
-    private final StackPane stackPane;
 
     private final List<Log> logs;
 
     public GameCrashWindow(ManagedProcess managedProcess, ProcessListener.ExitType exitType, DefaultGameRepository repository, Version version, LaunchOptions launchOptions, List<Log> logs) {
-        Themes.applyNativeDarkMode(this);
-
         this.managedProcess = managedProcess;
         this.exitType = exitType;
         this.repository = repository;
@@ -102,7 +91,7 @@ public class GameCrashWindow extends Stage {
         this.logs = logs;
         this.analyzer = LibraryAnalyzer.analyze(version, repository.getGameVersion(version).orElse(null));
 
-        memory = Optional.ofNullable(launchOptions.getMaxMemory()).map(i -> i + " " + i18n("settings.memory.unit.mib")).orElse("-");
+        memory = Optional.ofNullable(launchOptions.getMaxMemory()).map(i -> i + " MB").orElse("-");
 
         total_memory = MEGABYTES.formatBytes(SystemInfo.getTotalMemorySize());
 
@@ -112,10 +101,11 @@ public class GameCrashWindow extends Stage {
 
         this.view = new View();
 
-        this.stackPane = new StackPane(view);
         this.feedbackTextFlow.getChildren().addAll(FXUtils.parseSegment(i18n("game.crash.feedback"), Controllers::onHyperlinkAction));
 
-        setScene(new Scene(stackPane, 800, 480));
+        Scene scene = new Scene(view, 800, 480);
+        scene.setFill(Color.web("#0A0A0F"));
+        setScene(scene);
         StyleSheets.init(getScene());
         setTitle(i18n("game.crash.title"));
         FXUtils.setIcon(this);
@@ -142,7 +132,7 @@ public class GameCrashWindow extends Stage {
 
             return pair(CrashReportAnalyzer.analyze(rawLog), crashReport != null ? CrashReportAnalyzer.findKeywordsFromCrashReport(crashReport) : new HashSet<>());
         }), Task.supplyAsync(() -> {
-            Path latestLog = repository.getRunDirectory(version.getId()).resolve("logs/latest.log");
+            Path latestLog = repository.getRunDirectory(version.getId()).toPath().resolve("logs/latest.log");
             if (!Files.isReadable(latestLog)) {
                 return pair(new HashSet<CrashReportAnalyzer.Result>(), new HashSet<String>());
             }
@@ -274,41 +264,35 @@ public class GameCrashWindow extends Stage {
         logWindow.show();
     }
 
-    private CompletableFuture<Path> exportGameCrashInfo() {
+    private void exportGameCrashInfo() {
         Path logFile = Paths.get("minecraft-exported-crash-info-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH-mm-ss")) + ".zip").toAbsolutePath();
 
-        return CompletableFuture.supplyAsync(() ->
+        CompletableFuture.supplyAsync(() ->
                         logs.stream().map(Log::getLog).collect(Collectors.joining("\n")))
-                .thenComposeAsync(logs -> {
-                    long processStartTime = managedProcess.getProcess().info()
-                            .startInstant()
-                            .map(Instant::toEpochMilli).orElseGet(() -> {
-                                try {
-                                    return ManagementFactory.getRuntimeMXBean().getStartTime();
-                                } catch (Throwable e) {
-                                    LOG.warning("Failed to get process start time", e);
-                                    return 0L;
-                                }
-                            });
+                .thenComposeAsync(logs ->
+                        LogExporter.exportLogs(logFile, repository, launchOptions.getVersionName(), logs, new CommandBuilder().addAll(managedProcess.getCommands()).toString()))
+                .handleAsync((result, exception) -> {
+                    Alert alert;
 
-                    return LogExporter.exportLogs(logFile, repository, launchOptions.getVersionName(), logs,
-                            new CommandBuilder().addAll(managedProcess.getCommands()).toString(),
-                            path -> {
-                                try {
-                                    FileTime lastModifiedTime = Files.getLastModifiedTime(path);
-                                    return lastModifiedTime.toMillis() >= processStartTime;
-                                } catch (Throwable e) {
-                                    LOG.warning("Failed to read file attributes", e);
-                                    return false;
-                                }
-                            });
-                }).thenApply(ignored -> logFile);
+                    if (exception == null) {
+                        FXUtils.showFileInExplorer(logFile);
+                        alert = new Alert(Alert.AlertType.INFORMATION, i18n("settings.launcher.launcher_log.export.success", logFile));
+                    } else {
+                        LOG.warning("Failed to export game crash info", exception);
+                        alert = new Alert(Alert.AlertType.WARNING, i18n("settings.launcher.launcher_log.export.failed") + "\n" + StringUtils.getStackTrace(exception));
+                    }
+
+                    alert.setTitle(i18n("settings.launcher.launcher_log.export"));
+                    alert.showAndWait();
+
+                    return null;
+                });
     }
 
     private final class View extends VBox {
 
         View() {
-            this.getStyleClass().add("game-crash-window");
+            setStyle("-fx-background-color: #0A0A0F");
 
             HBox titlePane = new HBox();
             {
@@ -398,7 +382,7 @@ public class GameCrashWindow extends Stage {
                 TwoLineListItem gameDir = new TwoLineListItem();
                 gameDir.getStyleClass().setAll("two-line-item-second-large");
                 gameDir.setTitle(i18n("game.directory"));
-                gameDir.setSubtitle(launchOptions.getGameDir().toAbsolutePath().toString());
+                gameDir.setSubtitle(launchOptions.getGameDir().getAbsolutePath());
                 FXUtils.installFastTooltip(gameDir, i18n("game.directory"));
 
                 TwoLineListItem javaDir = new TwoLineListItem();
@@ -411,12 +395,9 @@ public class GameCrashWindow extends Stage {
                 reasonTitle.getStyleClass().add("two-line-item-second-large-title");
 
                 ScrollPane reasonPane = new ScrollPane(reasonTextFlow);
-                reasonTextFlow.getStyleClass().add("crash-reason-text-flow");
                 reasonPane.setFitToWidth(true);
                 reasonPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
                 reasonPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
-
-                feedbackTextFlow.getStyleClass().add("crash-reason-text-flow");
 
                 gameDirPane.setPadding(new Insets(8));
                 VBox.setVgrow(gameDirPane, Priority.ALWAYS);
@@ -430,37 +411,9 @@ public class GameCrashWindow extends Stage {
             }
 
             HBox toolBar = new HBox();
-            VBox.setMargin(toolBar, new Insets(0, 0, 4, 0));
             {
-                SpinnerPane exportButtonPane = new SpinnerPane();
-                exportButtonPane.getStyleClass().add("small-spinner-pane");
-
-                JFXButton exportButton = FXUtils.newRaisedButton(i18n("logwindow.export_game_crash_logs"));
-                exportButtonPane.setContent(exportButton);
-                exportButton.setOnAction(e -> {
-                    exportButtonPane.showSpinner();
-                    exportGameCrashInfo().whenCompleteAsync((result, exception) -> {
-                        exportButtonPane.hideSpinner();
-
-                        if (exception == null) {
-                            FXUtils.showFileInExplorer(result);
-                            var dialog = new MessageDialogPane.Builder(
-                                    i18n("settings.launcher.launcher_log.export.success", result),
-                                    i18n("message.success"),
-                                    MessageDialogPane.MessageType.SUCCESS
-                            ).ok(null).build();
-                            DialogUtils.show(stackPane, dialog);
-                        } else {
-                            LOG.warning("Failed to export game crash info", exception);
-                            var dialog = new MessageDialogPane.Builder(
-                                    i18n("settings.launcher.launcher_log.export.failed") + "\n" + StringUtils.getStackTrace(exception),
-                                    i18n("message.error"),
-                                    MessageDialogPane.MessageType.ERROR
-                            ).ok(null).build();
-                            DialogUtils.show(stackPane, dialog);
-                        }
-                    }, Schedulers.javafx());
-                });
+                JFXButton exportGameCrashInfoButton = FXUtils.newRaisedButton(i18n("logwindow.export_game_crash_logs"));
+                exportGameCrashInfoButton.setOnAction(e -> exportGameCrashInfo());
 
                 JFXButton logButton = FXUtils.newRaisedButton(i18n("logwindow.title"));
                 logButton.setOnAction(e -> showLogWindow());
@@ -469,10 +422,11 @@ public class GameCrashWindow extends Stage {
                 helpButton.setOnAction(e -> FXUtils.openLink(Metadata.CONTACT_URL));
                 FXUtils.installFastTooltip(helpButton, i18n("logwindow.help"));
 
+
                 toolBar.setPadding(new Insets(8));
                 toolBar.setSpacing(8);
                 toolBar.getStyleClass().add("jfx-tool-bar");
-                toolBar.getChildren().setAll(exportButtonPane, logButton, helpButton);
+                toolBar.getChildren().setAll(exportGameCrashInfoButton, logButton, helpButton);
             }
 
             getChildren().setAll(titlePane, infoPane, moddedPane, gameDirPane, toolBar);

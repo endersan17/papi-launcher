@@ -17,7 +17,6 @@
  */
 package org.jackhuang.hmcl.auth;
 
-import com.google.gson.JsonObject;
 import javafx.application.Platform;
 import javafx.beans.InvalidationListener;
 import javafx.beans.Observable;
@@ -29,11 +28,7 @@ import javafx.beans.property.SimpleBooleanProperty;
 import org.jackhuang.hmcl.auth.yggdrasil.Texture;
 import org.jackhuang.hmcl.auth.yggdrasil.TextureType;
 import org.jackhuang.hmcl.util.ToStringBuilder;
-import org.jackhuang.hmcl.util.gson.JsonUtils;
 import org.jackhuang.hmcl.util.javafx.ObservableHelper;
-import org.jetbrains.annotations.MustBeInvokedByOverriders;
-import org.jetbrains.annotations.NotNullByDefault;
-import org.jetbrains.annotations.Nullable;
 
 import java.nio.file.Path;
 import java.util.Map;
@@ -45,35 +40,22 @@ import java.util.UUID;
  *
  * @author huangyuhui
  */
-@NotNullByDefault
 public abstract class Account implements Observable {
-    /// The serialized account ID property name.
-    public static final String PROPERTY_ACCOUNT_ID = "accountID";
-
-    /// The stable ID of this account entry.
-    private final AccountID accountID;
-
-    /// Creates an account.
-    ///
-    /// @param accountID the stable account entry ID
-    protected Account(AccountID accountID) {
-        this.accountID = Objects.requireNonNull(accountID);
-    }
-
-    /// Returns the stable ID of this account entry.
-    public AccountID getAccountID() {
-        return accountID;
-    }
 
     /**
-     * @return the profile name
+     * @return the name of the account who owns the character
      */
-    public abstract String getProfileName();
+    public abstract String getUsername();
 
     /**
-     * @return the profile ID
+     * @return the character name
      */
-    public abstract UUID getProfileID();
+    public abstract String getCharacter();
+
+    /**
+     * @return the character UUID
+     */
+    public abstract UUID getUUID();
 
     /**
      * Login with stored credentials.
@@ -84,7 +66,6 @@ public abstract class Account implements Observable {
 
     /**
      * Play offline.
-     *
      * @return the specific offline player's info.
      */
     public abstract AuthInfo playOffline() throws AuthenticationException;
@@ -97,26 +78,7 @@ public abstract class Account implements Observable {
         throw new UnsupportedOperationException("Unsupported Operation");
     }
 
-    /// Writes public account metadata into the target JSON object.
-    ///
-    /// Metadata is stored in `accounts.json` and must not contain credentials or cached private profile data.
-    ///
-    /// The target object is owned by the caller. Implementations may only mutate it during this method call and must
-    /// not retain a reference to it.
-    @MustBeInvokedByOverriders
-    public void writeMetadata(JsonObject metadata) {
-        metadata.addProperty(PROPERTY_ACCOUNT_ID, accountID.toString());
-    }
-
-    /// Writes private account data into the target JSON object.
-    ///
-    /// Private data is stored outside `accounts.json` and may contain credentials or cached profile data.
-    ///
-    /// The target object is owned by the caller. Implementations may only mutate it during this method call and must
-    /// not retain a reference to it.
-    @MustBeInvokedByOverriders
-    public void writePrivateData(JsonObject privateData) {
-    }
+    public abstract Map<Object, Object> toStorage();
 
     public void clearCache() {
     }
@@ -135,36 +97,7 @@ public abstract class Account implements Observable {
         this.portable.set(value);
     }
 
-    /// Returns the stable account ID for the given serialized account record.
-    ///
-    /// @param storage the serialized account record
-    /// @return the stable account ID, or `null` if the account record has no valid account ID
-    public static @Nullable AccountID getAccountID(JsonObject storage) {
-        @Nullable String accountID = JsonUtils.getString(storage, PROPERTY_ACCOUNT_ID);
-        if (accountID == null) {
-            return null;
-        }
-
-        try {
-            return AccountID.parse(accountID);
-        } catch (IllegalArgumentException e) {
-            return null;
-        }
-    }
-
-    /// Reads an account ID from serialized account storage.
-    ///
-    /// @param storage the account storage object
-    /// @return the parsed account ID
-    /// @throws IllegalArgumentException if the storage has no valid account ID
-    public static AccountID readAccountID(JsonObject storage) {
-        @Nullable String accountID = JsonUtils.getString(storage, PROPERTY_ACCOUNT_ID);
-        if (accountID == null) {
-            throw new IllegalArgumentException("accountID is missing");
-        }
-
-        return AccountID.parse(accountID);
-    }
+    public abstract String getIdentifier();
 
     private final ObservableHelper helper = new ObservableHelper(this);
 
@@ -191,27 +124,27 @@ public abstract class Account implements Observable {
     }
 
     @Override
-    public final int hashCode() {
-        return Objects.hash(portable.get(), accountID);
+    public int hashCode() {
+        return Objects.hash(portable);
     }
 
     @Override
-    public final boolean equals(@Nullable Object obj) {
+    public boolean equals(Object obj) {
         if (this == obj)
             return true;
         if (!(obj instanceof Account))
             return false;
 
         Account another = (Account) obj;
-        return isPortable() == another.isPortable() && accountID.equals(another.accountID);
+        return isPortable() == another.isPortable();
     }
 
     @Override
     public String toString() {
         return new ToStringBuilder(this)
-                .append("accountID", accountID)
-                .append("profileName", getProfileName())
-                .append("profileID", getProfileID())
+                .append("username", getUsername())
+                .append("character", getCharacter())
+                .append("uuid", getUUID())
                 .append("portable", isPortable())
                 .toString();
     }

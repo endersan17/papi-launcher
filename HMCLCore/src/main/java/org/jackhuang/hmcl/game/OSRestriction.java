@@ -85,7 +85,7 @@ public final class OSRestriction {
             return false;
 
         if (version != null)
-            if (Lang.test(() -> !Pattern.compile(version).matcher(OperatingSystem.SYSTEM_VERSION.getVersion()).matches()))
+            if (Lang.test(() -> !Pattern.compile(version).matcher(OperatingSystem.SYSTEM_VERSION).matches()))
                 return false;
 
         if (arch != null)

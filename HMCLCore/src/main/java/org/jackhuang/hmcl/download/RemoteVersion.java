@@ -128,7 +128,6 @@ public class RemoteVersion implements Comparable<RemoteVersion> {
         RELEASE,
         SNAPSHOT,
         OLD,
-        PENDING,
-        UNOBFUSCATED,
+        PENDING
     }
 }

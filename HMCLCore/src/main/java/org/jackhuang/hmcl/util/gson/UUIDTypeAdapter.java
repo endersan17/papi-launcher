@@ -20,43 +20,42 @@ package org.jackhuang.hmcl.util.gson;
 import com.google.gson.JsonParseException;
 import com.google.gson.TypeAdapter;
 import com.google.gson.stream.JsonReader;
-import com.google.gson.stream.JsonToken;
 import com.google.gson.stream.JsonWriter;
-import org.glavo.uuid.UUIDs;
-import org.jetbrains.annotations.NotNullByDefault;
-import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
-/// Gson adapter for standard UUID strings.
-@NotNullByDefault
-public final class UUIDTypeAdapter extends TypeAdapter<@Nullable UUID> {
-    /// Shared adapter instance.
+/**
+ *
+ * @author huang
+ */
+public final class UUIDTypeAdapter extends TypeAdapter<UUID> {
+
     public static final UUIDTypeAdapter INSTANCE = new UUIDTypeAdapter();
 
-    /// Writes a UUID as a standard lowercase string with hyphens.
     @Override
-    public void write(JsonWriter writer, @Nullable UUID value) throws IOException {
-        writer.value(value == null ? null : value.toString());
+    public void write(JsonWriter writer, UUID value) throws IOException {
+        writer.value(value == null ? null : fromUUID(value));
     }
 
-    /// Reads a UUID from a standard or unhyphenated UUID string.
     @Override
-    public @Nullable UUID read(JsonReader reader) throws IOException {
-        if (reader.peek() == JsonToken.NULL) {
-            reader.nextNull();
-            return null;
-        }
-
+    public UUID read(JsonReader reader) throws IOException {
         try {
-            return UUIDs.parse(reader.nextString());
+            return fromString(reader.nextString());
         } catch (IllegalArgumentException e) {
-            throw new JsonParseException("UUID malformed", e);
+            throw new JsonParseException("UUID malformed");
         }
     }
 
-    /// Prevents instantiation outside the shared instance.
-    private UUIDTypeAdapter() {
+    public static String fromUUID(UUID value) {
+        return value.toString().replace("-", "");
     }
+
+    private static final Pattern regex = Pattern.compile("(\\w{8})(\\w{4})(\\w{4})(\\w{4})(\\w{12})");
+
+    public static UUID fromString(String input) {
+        return UUID.fromString(regex.matcher(input).replaceFirst("$1-$2-$3-$4-$5"));
+    }
+
 }

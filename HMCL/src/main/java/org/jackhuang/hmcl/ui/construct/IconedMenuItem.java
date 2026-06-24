@@ -18,13 +18,14 @@
 package org.jackhuang.hmcl.ui.construct;
 
 import com.jfoenix.controls.JFXPopup;
+import org.jackhuang.hmcl.setting.Theme;
 import org.jackhuang.hmcl.ui.FXUtils;
 import org.jackhuang.hmcl.ui.SVG;
 
-public final class IconedMenuItem extends IconedItem {
+public class IconedMenuItem extends IconedItem {
 
     public IconedMenuItem(SVG icon, String text, Runnable action, JFXPopup popup) {
-        super(icon != null ? icon.createIcon(14) : null, text);
+        super(icon != null ? FXUtils.limitingSize(icon.createIcon(Theme.blackFill(), 14), 14, 14) : null, text);
 
         getStyleClass().setAll("iconed-menu-item");
 

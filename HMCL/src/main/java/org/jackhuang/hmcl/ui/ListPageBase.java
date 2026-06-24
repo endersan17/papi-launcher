@@ -23,11 +23,10 @@ import javafx.collections.ObservableList;
 import javafx.event.Event;
 import javafx.event.EventHandler;
 import javafx.scene.control.Control;
-import org.jackhuang.hmcl.ui.animation.TransitionPane;
 
 import static org.jackhuang.hmcl.ui.construct.SpinnerPane.FAILED_ACTION;
 
-public class ListPageBase<T> extends Control implements TransitionPane.Cacheable {
+public class ListPageBase<T> extends Control {
     private final ListProperty<T> items = new SimpleListProperty<>(this, "items", FXCollections.observableArrayList());
     private final BooleanProperty loading = new SimpleBooleanProperty(this, "loading", false);
     private final StringProperty failedReason = new SimpleStringProperty(this, "failed");

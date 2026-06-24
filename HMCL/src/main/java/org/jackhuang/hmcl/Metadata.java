@@ -24,6 +24,7 @@ import org.jackhuang.hmcl.util.platform.OperatingSystem;
 import org.jetbrains.annotations.Nullable;
 
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.EnumSet;
 
 /**
@@ -33,63 +34,69 @@ public final class Metadata {
     private Metadata() {
     }
 
-    public static final String NAME = "HMCL";
-    public static final String FULL_NAME = "Hello Minecraft! Launcher";
+    public static final String NAME = "PAPI LAUNCHER";
+    public static final String FULL_NAME = "PAPI LAUNCHER";
     public static final String VERSION = System.getProperty("hmcl.version.override", JarUtils.getAttribute("hmcl.version", "@develop@"));
 
     public static final String TITLE = NAME + " " + VERSION;
     public static final String FULL_TITLE = FULL_NAME + " v" + VERSION;
 
-    public static final int MINIMUM_REQUIRED_JAVA_VERSION = 17;
+    public static final int MINIMUM_REQUIRED_JAVA_VERSION = 11;
     public static final int MINIMUM_SUPPORTED_JAVA_VERSION = 17;
     public static final int RECOMMENDED_JAVA_VERSION = 21;
 
     public static final String PUBLISH_URL = "https://hmcl.huangyuhui.net";
+    public static final String ABOUT_URL = PUBLISH_URL + "/about";
     public static final String DOWNLOAD_URL = PUBLISH_URL + "/download";
     public static final String HMCL_UPDATE_URL = System.getProperty("hmcl.update_source.override", PUBLISH_URL + "/api/update_link");
-    public static final String MANUAL_UPDATE_URL = "https://github.com/HMCL-dev/HMCL/releases";
 
     public static final String DOCS_URL = "https://docs.hmcl.net";
-    public static final String CONTACT_URL = DOCS_URL + "/help.html";
+    public static final String CONTACT_URL = "https://endersan17.github.io/papi-launcher-web/";
     public static final String CHANGELOG_URL = DOCS_URL + "/changelog/";
     public static final String EULA_URL = DOCS_URL + "/eula/hmcl.html";
-    public static final String GROUPS_URL = "https://www.bilibili.com/opus/905435541874409529";
+    public static final String GROUPS_URL = "https://endersan17.github.io/papi-launcher-web/";
+
+    // Papi Launcher specific URLs
+    public static final String PAPI_DISCORD_URL = "https://discord.gg/xvHtwE7QUv";
+    public static final String PAPI_GITHUB_URL = "https://github.com/endersan17/papi-launcher";
+    public static final String PAPI_AUTHOR_GITHUB_URL = "https://github.com/endersan17";
+    public static final String PAPI_WEBSITE_URL = "https://papi-launcher.example.com";
+    public static final String ISSUES_URL = "https://github.com/endersan17/papi-launcher/issues";
+    public static final String PAPI_ISSUES_URL = ISSUES_URL;
+    public static final String HMCL_GITHUB_URL = "https://github.com/HMCL-dev/HMCL";
+    public static final String HMCL_BILIBILI_URL = "https://space.bilibili.com/1445341";
 
     public static final String BUILD_CHANNEL = JarUtils.getAttribute("hmcl.version.type", "nightly");
     public static final String GITHUB_SHA = JarUtils.getAttribute("hmcl.version.hash", null);
 
-    public static final Path CURRENT_DIRECTORY = Path.of(System.getProperty("user.dir")).toAbsolutePath().normalize();
+    public static final Path CURRENT_DIRECTORY = Paths.get(System.getProperty("user.dir")).toAbsolutePath().normalize();
     public static final Path MINECRAFT_DIRECTORY = OperatingSystem.getWorkingDirectory("minecraft");
-    public static final Path HMCL_USER_HOME;
-    public static final Path HMCL_LOCAL_HOME;
+    public static final Path HMCL_GLOBAL_DIRECTORY;
+    public static final Path HMCL_CURRENT_DIRECTORY;
     public static final Path DEPENDENCIES_DIRECTORY;
 
     static {
-        String hmclHome = System.getProperty("hmcl.home", System.getenv("HMCL_USER_HOME"));
-        if (StringUtils.isBlank(hmclHome)) {
+        String hmclHome = System.getProperty("hmcl.home");
+        if (hmclHome == null) {
             if (OperatingSystem.CURRENT_OS.isLinuxOrBSD()) {
                 String xdgData = System.getenv("XDG_DATA_HOME");
                 if (StringUtils.isNotBlank(xdgData)) {
-                    HMCL_USER_HOME = Path.of(xdgData, "hmcl").toAbsolutePath().normalize();
+                    HMCL_GLOBAL_DIRECTORY = Paths.get(xdgData, "hmcl").toAbsolutePath().normalize();
                 } else {
-                    HMCL_USER_HOME = Path.of(System.getProperty("user.home"), ".local", "share", "hmcl").toAbsolutePath().normalize();
+                    HMCL_GLOBAL_DIRECTORY = Paths.get(System.getProperty("user.home"), ".local", "share", "hmcl").toAbsolutePath().normalize();
                 }
             } else {
-                HMCL_USER_HOME = OperatingSystem.getWorkingDirectory("hmcl");
+                HMCL_GLOBAL_DIRECTORY = OperatingSystem.getWorkingDirectory("hmcl");
             }
         } else {
-            HMCL_USER_HOME = Path.of(hmclHome).toAbsolutePath().normalize();
+            HMCL_GLOBAL_DIRECTORY = Paths.get(hmclHome).toAbsolutePath().normalize();
         }
 
-        String hmclCurrentDir = System.getProperty("hmcl.dir", System.getenv("HMCL_LOCAL_HOME"));
-        HMCL_LOCAL_HOME = StringUtils.isNotBlank(hmclCurrentDir)
-                ? Path.of(hmclCurrentDir).toAbsolutePath().normalize()
+        String hmclCurrentDir = System.getProperty("hmcl.dir");
+        HMCL_CURRENT_DIRECTORY = hmclCurrentDir != null
+                ? Paths.get(hmclCurrentDir).toAbsolutePath().normalize()
                 : CURRENT_DIRECTORY.resolve(".hmcl");
-
-        String hmclDependencies = System.getProperty("hmcl.dependencies.dir", System.getenv("HMCL_DEPENDENCIES_DIR"));
-        DEPENDENCIES_DIRECTORY = StringUtils.isNotBlank(hmclDependencies)
-                ? Path.of(hmclDependencies).toAbsolutePath().normalize()
-                : HMCL_LOCAL_HOME.resolve("dependencies");
+        DEPENDENCIES_DIRECTORY = HMCL_CURRENT_DIRECTORY.resolve("dependencies");
     }
 
     public static boolean isStable() {

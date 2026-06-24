@@ -19,16 +19,14 @@ package org.jackhuang.hmcl.ui.versions;
 
 import org.jackhuang.hmcl.game.LocalizedRemoteModRepository;
 import org.jackhuang.hmcl.mod.RemoteModRepository;
-import org.jackhuang.hmcl.mod.curse.CurseAddon;
 import org.jackhuang.hmcl.mod.curse.CurseForgeRemoteModRepository;
 import org.jackhuang.hmcl.mod.modrinth.ModrinthRemoteModRepository;
 import org.jackhuang.hmcl.util.i18n.I18n;
 
 import java.util.MissingResourceException;
 
-import static org.jackhuang.hmcl.setting.SettingsManager.settings;
-import static org.jackhuang.hmcl.util.i18n.I18n.i18n;
 import static org.jackhuang.hmcl.util.logging.Logger.LOG;
+import static org.jackhuang.hmcl.util.i18n.I18n.i18n;
 
 public final class HMCLLocalizedDownloadListPage extends DownloadListPage {
     public static DownloadListPage ofMod(DownloadPage.DownloadCallback callback, boolean versionSelection) {
@@ -51,50 +49,19 @@ public final class HMCLLocalizedDownloadListPage extends DownloadListPage {
         return new HMCLLocalizedDownloadListPage(callback, versionSelection, RemoteModRepository.Type.RESOURCE_PACK, CurseForgeRemoteModRepository.RESOURCE_PACKS, ModrinthRemoteModRepository.RESOURCE_PACKS);
     }
 
-    public static DownloadListPage ofCurseForgeResourcePack(DownloadPage.DownloadCallback callback, boolean versionSelection) {
-        return new HMCLLocalizedDownloadListPage(callback, versionSelection, RemoteModRepository.Type.RESOURCE_PACK, CurseForgeRemoteModRepository.RESOURCE_PACKS, null);
-    }
-
-    public static DownloadListPage ofModrinthResourcePack(DownloadPage.DownloadCallback callback, boolean versionSelection) {
-        return new HMCLLocalizedDownloadListPage(callback, versionSelection, RemoteModRepository.Type.RESOURCE_PACK, null, ModrinthRemoteModRepository.RESOURCE_PACKS);
-    }
-
-    public static DownloadListPage ofShaderPack(DownloadPage.DownloadCallback callback, boolean versionSelection) {
-        var page = new HMCLLocalizedDownloadListPage(callback, versionSelection, RemoteModRepository.Type.SHADER_PACK, CurseForgeRemoteModRepository.SHADERS, ModrinthRemoteModRepository.SHADER_PACKS);
-        page.supportChinese.set(false);
-        return page;
-    }
-
     private HMCLLocalizedDownloadListPage(DownloadPage.DownloadCallback callback, boolean versionSelection, RemoteModRepository.Type type, CurseForgeRemoteModRepository curseForge, ModrinthRemoteModRepository modrinth) {
         super(null, callback, versionSelection);
 
         repository = new Repository(type, curseForge, modrinth);
 
         supportChinese.set(true);
-
-        boolean supportedCurseForge = CurseForgeRemoteModRepository.isAvailable() && curseForge != null;
-
-        downloadSources.setAll("mods.modrinth");
-        if (supportedCurseForge) {
-            downloadSources.add("mods.curseforge");
-        }
-
-        if ("curseforge".equalsIgnoreCase(settings().defaultAddonSourceProperty().get())) {
-            if (supportedCurseForge) {
-                downloadSource.set("mods.curseforge");
-            } else if (modrinth != null) {
-                downloadSource.set("mods.modrinth");
-            } else {
-                throw new AssertionError("Should not be here.");
-            }
+        downloadSources.get().setAll("mods.modrinth", "mods.curseforge");
+        if (modrinth != null) {
+            downloadSource.set("mods.modrinth");
+        } else if (curseForge != null) {
+            downloadSource.set("mods.curseforge");
         } else {
-            if (modrinth != null) {
-                downloadSource.set("mods.modrinth");
-            } else if (supportedCurseForge) {
-                downloadSource.set("mods.curseforge");
-            } else {
-                throw new AssertionError("Should not be here.");
-            }
+            throw new AssertionError("Should not be here.");
         }
     }
 
@@ -134,7 +101,7 @@ public final class HMCLLocalizedDownloadListPage extends DownloadListPage {
     }
 
     @Override
-    protected String getLocalizedCategory(String category, Object self) {
+    protected String getLocalizedCategory(String category) {
         if (category.isEmpty()) {
             return "";
         }
@@ -144,9 +111,6 @@ public final class HMCLLocalizedDownloadListPage extends DownloadListPage {
             return I18n.getResourceBundle().getString(key);
         } catch (MissingResourceException e) {
             LOG.warning("Cannot find key " + key + " in resource bundle");
-            if (self instanceof CurseAddon.Category curseCategory) {
-                return curseCategory.getName();
-            }
             return category;
         }
     }

@@ -20,8 +20,9 @@ package org.jackhuang.hmcl.game;
 import org.jackhuang.hmcl.java.JavaRuntime;
 import org.jetbrains.annotations.NotNull;
 
+import java.io.File;
 import java.io.Serializable;
-import java.nio.file.Path;
+import java.net.Proxy;
 import java.util.*;
 
 /**
@@ -30,7 +31,7 @@ import java.util.*;
  */
 public class LaunchOptions implements Serializable {
 
-    private Path gameDir;
+    private File gameDir;
     private JavaRuntime java;
     private String versionName;
     private String versionType;
@@ -46,29 +47,28 @@ public class LaunchOptions implements Serializable {
     private Integer width;
     private Integer height;
     private boolean fullscreen;
-    private QuickPlayOption quickPlayOption;
+    private String serverIp;
     private String wrapper;
-    private ProxyOption proxyOption;
+    private Proxy.Type proxyType;
+    private String proxyHost;
+    private int proxyPort;
+    private String proxyUser;
+    private String proxyPass;
     private boolean noGeneratedJVMArgs;
-    private boolean noGeneratedOptimizingJVMArgs;
     private String preLaunchCommand;
     private String postExitCommand;
-    private boolean useCustomNatives;
+    private NativesDirectoryType nativesDirType;
     private String nativesDir;
     private ProcessPriority processPriority = ProcessPriority.NORMAL;
-    private GraphicsAPI graphicsBackend = GraphicsAPI.DEFAULT;
     private Renderer renderer = Renderer.DEFAULT;
     private boolean useNativeGLFW;
     private boolean useNativeOpenAL;
-    private boolean enableDebugLogOutput;
-    private boolean allowAutoAgent;
-    private boolean disableAutoGameOptions;
     private boolean daemon;
 
     /**
      * The game directory
      */
-    public Path getGameDir() {
+    public File getGameDir() {
         return gameDir;
     }
 
@@ -179,11 +179,11 @@ public class LaunchOptions implements Serializable {
         return fullscreen;
     }
 
-    /// The quick play option.
-    ///
-    /// @see <a href="https://minecraft.wiki/w/Quick_Play">Quick Play - Minecraft Wiki</a>
-    public QuickPlayOption getQuickPlayOption() {
-        return quickPlayOption;
+    /**
+     * The server ip that will connect to when enter game main menu.
+     */
+    public String getServerIp() {
+        return serverIp;
     }
 
     /**
@@ -193,8 +193,30 @@ public class LaunchOptions implements Serializable {
         return wrapper;
     }
 
-    public ProxyOption getProxyOption() {
-        return proxyOption;
+    public Proxy.Type getProxyType() {
+        return proxyType;
+    }
+
+    public String getProxyHost() {
+        return proxyHost;
+    }
+
+    public int getProxyPort() {
+        return proxyPort;
+    }
+
+    /**
+     * The user name of the proxy, optional.
+     */
+    public String getProxyUser() {
+        return proxyUser;
+    }
+
+    /**
+     * The password of the proxy, optional
+     */
+    public String getProxyPass() {
+        return proxyPass;
     }
 
     /**
@@ -202,13 +224,6 @@ public class LaunchOptions implements Serializable {
      */
     public boolean isNoGeneratedJVMArgs() {
         return noGeneratedJVMArgs;
-    }
-
-    /**
-     * Prevent game launcher from generating optimizing JVM arguments.
-     */
-    public boolean isNoGeneratedOptimizingJVMArgs() {
-        return noGeneratedOptimizingJVMArgs;
     }
 
     /**
@@ -225,12 +240,17 @@ public class LaunchOptions implements Serializable {
         return postExitCommand;
     }
 
-    /// Whether native libraries are supplied and managed outside HMCL.
-    public boolean isUseCustomNatives() {
-        return useCustomNatives;
+    /**
+     * 0 - ./minecraft/versions/&lt;version&gt;/natives
+     * 1 - custom natives directory
+     */
+    public NativesDirectoryType getNativesDirType() {
+        return nativesDirType;
     }
 
-    /// Path to the natives directory, or blank for the default directory.
+    /**
+     * Path to the natives directory, optional
+     */
     public String getNativesDir() {
         return nativesDir;
     }
@@ -242,11 +262,7 @@ public class LaunchOptions implements Serializable {
         return processPriority;
     }
 
-    public @NotNull GraphicsAPI getGraphicsBackend() {
-        return graphicsBackend;
-    }
-
-    public @NotNull Renderer getRenderer() {
+    public Renderer getRenderer() {
         return renderer;
     }
 
@@ -258,19 +274,6 @@ public class LaunchOptions implements Serializable {
         return useNativeOpenAL;
     }
 
-    public boolean isEnableDebugLogOutput() {
-        return enableDebugLogOutput;
-    }
-
-    public boolean isAllowAutoAgent() {
-        return allowAutoAgent;
-    }
-
-    /// Returns whether automatic game options generation is disabled.
-    public boolean isDisableAutoGameOptions() {
-        return disableAutoGameOptions;
-    }
-
     /**
      * Will launcher keeps alive after game launched or not.
      */
@@ -278,9 +281,47 @@ public class LaunchOptions implements Serializable {
         return daemon;
     }
 
-    public static final class Builder {
+    public static class Builder {
 
         private final LaunchOptions options = new LaunchOptions();
+
+        public static Builder from(LaunchOptions existing) {
+            Builder builder = new Builder();
+            builder.options.gameDir = existing.gameDir;
+            builder.options.java = existing.java;
+            builder.options.versionName = existing.versionName;
+            builder.options.versionType = existing.versionType;
+            builder.options.profileName = existing.profileName;
+            builder.options.gameArguments.addAll(existing.gameArguments);
+            builder.options.overrideJavaArguments.addAll(existing.overrideJavaArguments);
+            builder.options.javaArguments.addAll(existing.javaArguments);
+            builder.options.javaAgents.addAll(existing.javaAgents);
+            builder.options.environmentVariables.putAll(existing.environmentVariables);
+            builder.options.minMemory = existing.minMemory;
+            builder.options.maxMemory = existing.maxMemory;
+            builder.options.metaspace = existing.metaspace;
+            builder.options.width = existing.width;
+            builder.options.height = existing.height;
+            builder.options.fullscreen = existing.fullscreen;
+            builder.options.serverIp = existing.serverIp;
+            builder.options.wrapper = existing.wrapper;
+            builder.options.proxyType = existing.proxyType;
+            builder.options.proxyHost = existing.proxyHost;
+            builder.options.proxyPort = existing.proxyPort;
+            builder.options.proxyUser = existing.proxyUser;
+            builder.options.proxyPass = existing.proxyPass;
+            builder.options.noGeneratedJVMArgs = existing.noGeneratedJVMArgs;
+            builder.options.preLaunchCommand = existing.preLaunchCommand;
+            builder.options.postExitCommand = existing.postExitCommand;
+            builder.options.nativesDirType = existing.nativesDirType;
+            builder.options.nativesDir = existing.nativesDir;
+            builder.options.processPriority = existing.processPriority;
+            builder.options.renderer = existing.renderer;
+            builder.options.useNativeGLFW = existing.useNativeGLFW;
+            builder.options.useNativeOpenAL = existing.useNativeOpenAL;
+            builder.options.daemon = existing.daemon;
+            return builder;
+        }
 
         public LaunchOptions create() {
             return options;
@@ -311,7 +352,7 @@ public class LaunchOptions implements Serializable {
             return options.javaAgents;
         }
 
-        public Builder setGameDir(Path gameDir) {
+        public Builder setGameDir(File gameDir) {
             options.gameDir = gameDir;
             return this;
         }
@@ -396,8 +437,8 @@ public class LaunchOptions implements Serializable {
             return this;
         }
 
-        public Builder setQuickPlayOption(QuickPlayOption quickPlayOption) {
-            options.quickPlayOption = quickPlayOption;
+        public Builder setServerIp(String serverIp) {
+            options.serverIp = serverIp;
             return this;
         }
 
@@ -406,18 +447,33 @@ public class LaunchOptions implements Serializable {
             return this;
         }
 
-        public Builder setProxyOption(ProxyOption proxyOption) {
-            options.proxyOption = proxyOption;
+        public Builder setProxyType(Proxy.Type proxyType) {
+            options.proxyType = proxyType;
+            return this;
+        }
+
+        public Builder setProxyHost(String proxyHost) {
+            options.proxyHost = proxyHost;
+            return this;
+        }
+
+        public Builder setProxyPort(int proxyPort) {
+            options.proxyPort = proxyPort;
+            return this;
+        }
+
+        public Builder setProxyUser(String proxyUser) {
+            options.proxyUser = proxyUser;
+            return this;
+        }
+
+        public Builder setProxyPass(String proxyPass) {
+            options.proxyPass = proxyPass;
             return this;
         }
 
         public Builder setNoGeneratedJVMArgs(boolean noGeneratedJVMArgs) {
             options.noGeneratedJVMArgs = noGeneratedJVMArgs;
-            return this;
-        }
-
-        public Builder setNoGeneratedOptimizingJVMArgs(boolean noGeneratedOptimizingJVMArgs) {
-            options.noGeneratedOptimizingJVMArgs = noGeneratedOptimizingJVMArgs;
             return this;
         }
 
@@ -431,8 +487,8 @@ public class LaunchOptions implements Serializable {
             return this;
         }
 
-        public Builder setUseCustomNatives(boolean useCustomNatives) {
-            options.useCustomNatives = useCustomNatives;
+        public Builder setNativesDirType(NativesDirectoryType nativesDirType) {
+            options.nativesDirType = nativesDirType;
             return this;
         }
 
@@ -446,13 +502,8 @@ public class LaunchOptions implements Serializable {
             return this;
         }
 
-        public Builder setGraphicsBackend(GraphicsAPI backend) {
-            options.graphicsBackend = Objects.requireNonNullElse(backend, GraphicsAPI.DEFAULT);
-            return this;
-        }
-
-        public Builder setRenderer(Renderer renderer) {
-            options.renderer = Objects.requireNonNullElse(renderer, Renderer.DEFAULT);
+        public Builder setRenderer(@NotNull Renderer renderer) {
+            options.renderer = renderer;
             return this;
         }
 
@@ -471,19 +522,5 @@ public class LaunchOptions implements Serializable {
             return this;
         }
 
-        public Builder setEnableDebugLogOutput(boolean u) {
-            options.enableDebugLogOutput = u;
-            return this;
-        }
-
-        public Builder setAllowAutoAgent(boolean allowAutoAgent) {
-            options.allowAutoAgent = allowAutoAgent;
-            return this;
-        }
-
-        public Builder setDisableAutoGameOptions(boolean disableAutoGameOptions) {
-            options.disableAutoGameOptions = disableAutoGameOptions;
-            return this;
-        }
     }
 }

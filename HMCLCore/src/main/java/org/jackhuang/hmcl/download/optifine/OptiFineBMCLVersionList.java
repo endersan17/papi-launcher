@@ -80,7 +80,7 @@ public final class OptiFineBMCLVersionList extends VersionList<OptiFineRemoteVer
                 Set<String> duplicates = new HashSet<>();
                 for (OptiFineVersion element : root) {
                     String version = element.getType() + "_" + element.getPatch();
-                    String mirror = apiRoot + "/optifine/" + toLookupVersion(element.getGameVersion()) + "/" + element.getType() + "/" + element.getPatch();
+                    String mirror = "https://bmclapi2.bangbang93.com/optifine/" + toLookupVersion(element.getGameVersion()) + "/" + element.getType() + "/" + element.getPatch();
                     if (!duplicates.add(mirror))
                         continue;
 
@@ -91,6 +91,37 @@ public final class OptiFineBMCLVersionList extends VersionList<OptiFineRemoteVer
 
                     String gameVersion = VersionNumber.normalize(fromLookupVersion(element.getGameVersion()));
                     versions.put(gameVersion, new OptiFineRemoteVersion(gameVersion, version, Collections.singletonList(mirror), isPre));
+                }
+            } finally {
+                lock.writeLock().unlock();
+            }
+        });
+    }
+
+    @Override
+    public Task<?> refreshAsync(String gameVersion) {
+        String normalizedGameVersion = VersionNumber.normalize(gameVersion);
+        return new GetTask(apiRoot + "/optifine/versionlist").thenGetJsonAsync(listTypeOf(OptiFineVersion.class)).thenAcceptAsync(root -> {
+            lock.writeLock().lock();
+
+            try {
+                versions.clear();
+                Set<String> duplicates = new HashSet<>();
+                for (OptiFineVersion element : root) {
+                    if (StringUtils.isBlank(element.getGameVersion()))
+                        continue;
+
+                    String elementGameVersion = VersionNumber.normalize(fromLookupVersion(element.getGameVersion()));
+                    if (!normalizedGameVersion.equals(elementGameVersion))
+                        continue;
+
+                    String version = element.getType() + "_" + element.getPatch();
+                    String mirror = "https://bmclapi2.bangbang93.com/optifine/" + toLookupVersion(element.getGameVersion()) + "/" + element.getType() + "/" + element.getPatch();
+                    if (!duplicates.add(mirror))
+                        continue;
+
+                    boolean isPre = element.getPatch() != null && (element.getPatch().startsWith("pre") || element.getPatch().startsWith("alpha"));
+                    versions.put(elementGameVersion, new OptiFineRemoteVersion(elementGameVersion, version, Collections.singletonList(mirror), isPre));
                 }
             } finally {
                 lock.writeLock().unlock();

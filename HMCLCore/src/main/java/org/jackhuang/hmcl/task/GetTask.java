@@ -20,15 +20,11 @@ package org.jackhuang.hmcl.task;
 import com.google.gson.reflect.TypeToken;
 import org.jackhuang.hmcl.util.gson.JsonUtils;
 import org.jackhuang.hmcl.util.io.NetworkUtils;
-import org.jackhuang.hmcl.util.io.UrlResponseInfo;
-import org.jetbrains.annotations.Nullable;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URI;
-import java.net.http.HttpResponse;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
+import java.net.URLConnection;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -63,18 +59,11 @@ public final class GetTask extends FetchTask<String> {
     }
 
     @Override
-    protected Context getContext(@Nullable HttpResponse<?> response, boolean checkETag, String bmclapiHash) {
-        long length = -1;
-        if (response != null)
-            length = response.headers().firstValueAsLong("content-length").orElse(-1L);
-        final var baos = new ByteArrayOutputStream(length <= 0 ? 8192 : (int) length);
+    protected Context getContext(URLConnection connection, boolean checkETag, String bmclapiHash) {
+        int length = connection.getContentLength();
+        final var baos = new ByteArrayOutputStream(length <= 0 ? 8192 : length);
 
         return new Context() {
-            @Override
-            public void reset() throws IOException {
-                baos.reset();
-            }
-
             @Override
             public void write(byte[] buffer, int offset, int len) {
                 baos.write(buffer, offset, len);
@@ -84,15 +73,11 @@ public final class GetTask extends FetchTask<String> {
             public void close() throws IOException {
                 if (!isSuccess()) return;
 
-                Charset charset = StandardCharsets.UTF_8;
-                if (response != null)
-                    charset = NetworkUtils.getCharsetFromContentType(response.headers().firstValue("content-type").orElse(null));
-
-                String result = baos.toString(charset);
+                String result = baos.toString(NetworkUtils.getCharsetFromContentType(connection.getContentType()));
                 setResult(result);
 
                 if (checkETag) {
-                    repository.cacheText(UrlResponseInfo.of(response), result);
+                    repository.cacheText(connection, result);
                 }
             }
         };

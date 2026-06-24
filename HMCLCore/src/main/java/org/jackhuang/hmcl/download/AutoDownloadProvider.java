@@ -18,99 +18,60 @@
 package org.jackhuang.hmcl.download;
 
 import java.net.URI;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.function.Function;
 
-/// @author huangyuhui
-public final class AutoDownloadProvider implements DownloadProvider {
-    private final List<DownloadProvider> versionListProviders;
-    private final List<DownloadProvider> fileProviders;
-    private final ConcurrentMap<String, VersionList<?>> versionLists = new ConcurrentHashMap<>();
+/**
+ * Official Download Provider fetches version list from Mojang and
+ * download files from mcbbs.
+ *
+ * @author huangyuhui
+ */
+public class AutoDownloadProvider implements DownloadProvider {
+    private final DownloadProvider versionListProvider;
+    private final DownloadProvider fileProvider;
 
-    public AutoDownloadProvider(
-            List<DownloadProvider> versionListProviders,
-            List<DownloadProvider> fileProviders) {
-        if (versionListProviders == null || versionListProviders.isEmpty()) {
-            throw new IllegalArgumentException("versionListProviders must not be null or empty");
-        }
-
-        if (fileProviders == null || fileProviders.isEmpty()) {
-            throw new IllegalArgumentException("fileProviders must not be null or empty");
-        }
-
-        this.versionListProviders = versionListProviders;
-        this.fileProviders = fileProviders;
-    }
-
-    public AutoDownloadProvider(DownloadProvider... downloadProviderCandidate) {
-        if (downloadProviderCandidate.length == 0) {
-            throw new IllegalArgumentException("Download provider must have at least one download provider");
-        }
-
-        this.versionListProviders = List.of(downloadProviderCandidate);
-        this.fileProviders = versionListProviders;
-    }
-
-    private DownloadProvider getPreferredDownloadProvider() {
-        return fileProviders.get(0);
-    }
-
-    private static List<URI> getAll(
-            List<DownloadProvider> providers,
-            Function<DownloadProvider, List<URI>> function) {
-        LinkedHashSet<URI> result = new LinkedHashSet<>();
-        for (DownloadProvider provider : providers) {
-            result.addAll(function.apply(provider));
-        }
-        return List.copyOf(result);
+    public AutoDownloadProvider(DownloadProvider versionListProvider, DownloadProvider fileProvider) {
+        this.versionListProvider = versionListProvider;
+        this.fileProvider = fileProvider;
     }
 
     @Override
-    public List<URI> getVersionListURLs() {
-        return getAll(versionListProviders, DownloadProvider::getVersionListURLs);
+    public String getVersionListURL() {
+        return versionListProvider.getVersionListURL();
+    }
+
+    @Override
+    public String getAssetBaseURL() {
+        return fileProvider.getAssetBaseURL();
     }
 
     @Override
     public String injectURL(String baseURL) {
-        return getPreferredDownloadProvider().injectURL(baseURL);
+        return fileProvider.injectURL(baseURL);
     }
 
     @Override
     public List<URI> getAssetObjectCandidates(String assetObjectLocation) {
-        return getAll(fileProviders, provider -> provider.getAssetObjectCandidates(assetObjectLocation));
+        return fileProvider.getAssetObjectCandidates(assetObjectLocation);
     }
 
     @Override
     public List<URI> injectURLWithCandidates(String baseURL) {
-        return getAll(fileProviders, provider -> provider.injectURLWithCandidates(baseURL));
+        return fileProvider.injectURLWithCandidates(baseURL);
     }
 
     @Override
     public List<URI> injectURLsWithCandidates(List<String> urls) {
-        return getAll(fileProviders, provider -> provider.injectURLsWithCandidates(urls));
+        return fileProvider.injectURLsWithCandidates(urls);
     }
 
     @Override
     public VersionList<?> getVersionListById(String id) {
-        return versionLists.computeIfAbsent(id, value -> {
-            VersionList<?>[] lists = new VersionList<?>[versionListProviders.size()];
-            for (int i = 0; i < versionListProviders.size(); i++) {
-                lists[i] = versionListProviders.get(i).getVersionListById(value);
-            }
-            return new MultipleSourceVersionList(lists);
-        });
+        return versionListProvider.getVersionListById(id);
     }
 
     @Override
     public int getConcurrency() {
-        return getPreferredDownloadProvider().getConcurrency();
-    }
-
-    @Override
-    public String toString() {
-        return "AutoDownloadProvider[versionListProviders=%s, fileProviders=%s]".formatted(versionListProviders, fileProviders);
+        return fileProvider.getConcurrency();
     }
 }

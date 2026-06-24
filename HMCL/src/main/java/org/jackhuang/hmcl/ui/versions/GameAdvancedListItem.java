@@ -17,7 +17,8 @@
  */
 package org.jackhuang.hmcl.ui.versions;
 
-import javafx.geometry.Pos;
+import javafx.scene.Node;
+import javafx.scene.image.ImageView;
 import org.jackhuang.hmcl.event.Event;
 import org.jackhuang.hmcl.setting.Profile;
 import org.jackhuang.hmcl.setting.Profiles;
@@ -25,26 +26,27 @@ import org.jackhuang.hmcl.setting.VersionIconType;
 import org.jackhuang.hmcl.ui.FXUtils;
 import org.jackhuang.hmcl.ui.WeakListenerHolder;
 import org.jackhuang.hmcl.ui.construct.AdvancedListItem;
-import org.jackhuang.hmcl.ui.construct.ImageContainer;
+import org.jackhuang.hmcl.util.Pair;
 
 import java.util.function.Consumer;
 
 import static org.jackhuang.hmcl.util.i18n.I18n.i18n;
 
 public class GameAdvancedListItem extends AdvancedListItem {
-    private final ImageContainer imageContainer;
+    private final ImageView imageView;
     private final WeakListenerHolder holder = new WeakListenerHolder();
     private Profile profile;
     @SuppressWarnings("unused")
     private Consumer<Event> onVersionIconChangedListener;
 
     public GameAdvancedListItem() {
-        this.imageContainer = new ImageContainer(LEFT_GRAPHIC_SIZE);
-        imageContainer.setMouseTransparent(true);
-        AdvancedListItem.setAlignment(imageContainer, Pos.CENTER);
-        setLeftGraphic(imageContainer);
+        Pair<Node, ImageView> view = createImageView(null);
+        setLeftGraphic(view.getKey());
+        imageView = view.getValue();
 
-        holder.add(FXUtils.onWeakChangeAndOperate(Profiles.selectedInstanceProperty(), this::loadVersion));
+        holder.add(FXUtils.onWeakChangeAndOperate(Profiles.selectedVersionProperty(), this::loadVersion));
+
+        setActionButtonVisible(false);
     }
 
     private void loadVersion(String version) {
@@ -52,7 +54,7 @@ public class GameAdvancedListItem extends AdvancedListItem {
             profile = Profiles.getSelectedProfile();
             if (profile != null) {
                 onVersionIconChangedListener = profile.getRepository().onVersionIconChanged.registerWeak(event -> {
-                    this.loadVersion(Profiles.getSelectedInstance());
+                    this.loadVersion(Profiles.getSelectedVersion());
                 });
             }
         }
@@ -60,11 +62,11 @@ public class GameAdvancedListItem extends AdvancedListItem {
                 Profiles.getSelectedProfile().getRepository().hasVersion(version)) {
             setTitle(i18n("version.manage.manage"));
             setSubtitle(version);
-            imageContainer.setImage(Profiles.getSelectedProfile().getRepository().getVersionIconImage(version));
+            imageView.setImage(Profiles.getSelectedProfile().getRepository().getVersionIconImage(version));
         } else {
             setTitle(i18n("version.empty"));
             setSubtitle(i18n("version.empty.add"));
-            imageContainer.setImage(VersionIconType.DEFAULT.getIcon());
+            imageView.setImage(VersionIconType.DEFAULT.getIcon());
         }
     }
 }

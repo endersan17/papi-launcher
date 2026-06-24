@@ -43,7 +43,7 @@ public final class WebPage extends SpinnerPane implements DecoratorPage {
 
     public WebPage(String title, String content) {
         this.stateProperty = new SimpleObjectProperty<>(DecoratorPage.State.fromTitle(title));
-        this.setBackground(new Background(new BackgroundFill(Color.WHITE, null, null)));
+        this.setBackground(new Background(new BackgroundFill(Color.web("#0A0A0F"), null, null)));
 
         Task.supplyAsync(() -> {
             Document document = Jsoup.parseBodyFragment(content);

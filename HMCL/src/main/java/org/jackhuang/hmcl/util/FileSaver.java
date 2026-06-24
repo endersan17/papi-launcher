@@ -22,7 +22,6 @@ import org.jackhuang.hmcl.util.io.FileUtils;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -30,20 +29,17 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import static org.jackhuang.hmcl.util.logging.Logger.LOG;
 
-/// @author Glavo
+/**
+ * @author Glavo
+ */
 public final class FileSaver extends Thread {
 
-    private static final BlockingQueue<Action> queue = new LinkedBlockingQueue<>();
+    private static final Pair<Path, String> SHUTDOWN = Pair.pair(null, null);
+
+    private static final BlockingQueue<Pair<Path, String>> queue = new LinkedBlockingQueue<>();
     private static final AtomicBoolean running = new AtomicBoolean(false);
     private static final ReentrantLock runningLock = new ReentrantLock();
     private static volatile boolean shutdown = false;
-
-    private static void addAction(Action action) {
-        queue.add(action);
-        if (running.compareAndSet(false, true)) {
-            new FileSaver().start();
-        }
-    }
 
     private static void doSave(Map<Path, String> map) {
         for (Map.Entry<Path, String> entry : map.entrySet()) {
@@ -57,7 +53,10 @@ public final class FileSaver extends Thread {
 
         ShutdownHook.ensureInstalled();
 
-        addAction(new DoSave(file, content));
+        queue.add(Pair.pair(file, content));
+        if (running.compareAndSet(false, true)) {
+            new FileSaver().start();
+        }
     }
 
     public static void saveSync(Path file, String content) {
@@ -71,17 +70,7 @@ public final class FileSaver extends Thread {
 
     public static void shutdown() {
         shutdown = true;
-        queue.add(Shutdown.INSTANCE);
-    }
-
-    /// Wait for all saves to complete.
-    ///
-    /// This method should be called before the [#shutdown()] method.
-    public static void waitForAllSaves() throws InterruptedException {
-        assert !shutdown;
-        Wait wait = new Wait();
-        addAction(wait);
-        wait.await();
+        queue.add(SHUTDOWN);
     }
 
     private FileSaver() {
@@ -103,74 +92,40 @@ public final class FileSaver extends Thread {
         runningLock.lock();
         try {
             HashMap<Path, String> map = new HashMap<>();
-            ArrayList<Action> buffer = new ArrayList<>();
-            ArrayList<Wait> waits = new ArrayList<>();
+            ArrayList<Pair<Path, String>> buffer = new ArrayList<>();
 
             while (!stopped) {
                 if (shutdown) {
                     stopCurrentSaver();
                 } else {
-                    Action head = queue.poll(30, TimeUnit.SECONDS);
-                    if (head instanceof DoSave save) {
-                        map.put(save.file(), save.content());
+                    Pair<Path, String> head = queue.poll(30, TimeUnit.SECONDS);
+                    if (head == null || head == SHUTDOWN) {
+                        stopCurrentSaver();
+                    } else {
+                        map.put(head.getKey(), head.getValue());
                         //noinspection BusyWait
                         Thread.sleep(200); // Waiting for more changes
-                    } else if (head instanceof Wait wait) {
-                        waits.add(wait);
-                    } else if (head == null || head instanceof Shutdown) {
-                        // Shutdown or timeout
-                        stopCurrentSaver();
                     }
                 }
 
                 while (queue.drainTo(buffer) > 0) {
-                    for (Action action : buffer) {
-                        if (action instanceof DoSave save) {
-                            map.put(save.file(), save.content());
-                        } else if (action instanceof Wait wait) {
-                            waits.add(wait);
-                        } else if (action instanceof Shutdown) {
+                    for (Pair<Path, String> pair : buffer) {
+                        if (pair == SHUTDOWN)
                             stopCurrentSaver();
-                        }
+                        else
+                            map.put(pair.getKey(), pair.getValue());
                     }
                     buffer.clear();
                 }
 
                 doSave(map);
                 map.clear();
-
-                for (Wait wait : waits) {
-                    wait.countDown();
-                }
-                waits.clear();
             }
         } catch (InterruptedException e) {
             throw new AssertionError("This thread cannot be interrupted", e);
         } finally {
             runningLock.unlock();
         }
-    }
-
-    private sealed interface Action {
-    }
-
-    private record DoSave(Path file, String content) implements Action {
-    }
-
-    private static final class Wait implements Action {
-        private final CountDownLatch latch = new CountDownLatch(1);
-
-        public void await() throws InterruptedException {
-            latch.await();
-        }
-
-        public void countDown() {
-            latch.countDown();
-        }
-    }
-
-    private enum Shutdown implements Action {
-        INSTANCE
     }
 
     private static final class ShutdownHook extends Thread {
@@ -189,10 +144,9 @@ public final class FileSaver extends Thread {
             runningLock.lock();
             try {
                 HashMap<Path, String> map = new HashMap<>();
-                for (Action action : queue) {
-                    if (action instanceof DoSave save) {
-                        map.put(save.file(), save.content());
-                    }
+                for (Pair<Path, String> pair : queue) {
+                    if (pair != SHUTDOWN)
+                        map.put(pair.getKey(), pair.getValue());
                 }
                 doSave(map);
             } finally {

@@ -17,18 +17,21 @@
  */
 package org.jackhuang.hmcl.ui.main;
 
-import com.google.gson.*;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParseException;
+import javafx.application.Platform;
+import javafx.geometry.Insets;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.image.Image;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.stage.Screen;
 import org.jackhuang.hmcl.Metadata;
-import org.jackhuang.hmcl.theme.Themes;
 import org.jackhuang.hmcl.ui.FXUtils;
-import org.jackhuang.hmcl.ui.SVG;
-import org.jackhuang.hmcl.ui.WeakListenerHolder;
 import org.jackhuang.hmcl.ui.construct.ComponentList;
-import org.jackhuang.hmcl.ui.construct.LineButton;
-import org.jackhuang.hmcl.ui.construct.SpinnerPane;
+import org.jackhuang.hmcl.ui.construct.IconedTwoLineListItem;
 import org.jackhuang.hmcl.util.gson.JsonUtils;
 
 import java.io.IOException;
@@ -37,33 +40,59 @@ import java.io.InputStream;
 import static org.jackhuang.hmcl.util.i18n.I18n.i18n;
 import static org.jackhuang.hmcl.util.logging.Logger.LOG;
 
-public final class AboutPage extends SpinnerPane {
-
-    private final WeakListenerHolder holder = new WeakListenerHolder();
+public final class AboutPage extends StackPane {
 
     public AboutPage() {
-        VBox content = new VBox();
-        content.getStyleClass().add("spinner-pane-content");
-        ScrollPane scrollPane = new ScrollPane(content);
-        scrollPane.setFitToWidth(true);
-        FXUtils.smoothScrolling(scrollPane);
-        setContent(scrollPane);
-
-        ComponentList about = new ComponentList();
+        ComponentList papiLauncher = new ComponentList();
         {
-            var launcher = LineButton.createExternalLinkButton(Metadata.PUBLISH_URL);
-            launcher.setLargeTitle(true);
-            launcher.setLeading(FXUtils.newBuiltinImage("/assets/img/icon.png"));
-            launcher.setTitle("Hello Minecraft! Launcher");
+            IconedTwoLineListItem launcher = new IconedTwoLineListItem();
+            launcher.setImage(FXUtils.newBuiltinImage(resolveHiDPIImage("/assets/img/icon.png")));
+            launcher.setTitle("PAPI LAUNCHER");
             launcher.setSubtitle(Metadata.VERSION);
+            launcher.setExternalLink(Metadata.PAPI_WEBSITE_URL);
 
-            var author = LineButton.createExternalLinkButton("https://space.bilibili.com/1445341");
-            author.setLargeTitle(true);
-            author.setLeading(FXUtils.newBuiltinImage("/assets/img/yellow_fish.png"));
+            IconedTwoLineListItem author = new IconedTwoLineListItem();
+            author.setImage(FXUtils.newBuiltinImage(resolveHiDPIImage("/assets/img/endersan17-profile.png")));
+            author.setTitle("endersan17");
+            author.setSubtitle(i18n("about.papi_launcher.author.statement"));
+            author.setExternalLink(Metadata.PAPI_AUTHOR_GITHUB_URL);
+
+            IconedTwoLineListItem soystormy = new IconedTwoLineListItem();
+            soystormy.setImage(FXUtils.newBuiltinImage(resolveHiDPIImage("/assets/img/soystormy-profile.png")));
+            soystormy.setTitle(i18n("about.soystormy"));
+            soystormy.setSubtitle(i18n("about.soystormy.statement"));
+            soystormy.setExternalLink("https://github.com/JuanStormy23");
+
+            IconedTwoLineListItem discordLink = new IconedTwoLineListItem();
+            discordLink.setImage(FXUtils.newBuiltinImage(resolveHiDPIImage("/assets/img/discord.png")));
+            discordLink.setTitle(i18n("feedback.discord"));
+            discordLink.setSubtitle(i18n("feedback.papi_community.discord.statement"));
+            discordLink.setExternalLink(Metadata.PAPI_DISCORD_URL);
+
+            IconedTwoLineListItem githubLink = new IconedTwoLineListItem();
+            githubLink.setImage(FXUtils.newBuiltinImage(resolveHiDPIImage("/assets/img/github.png")));
+            githubLink.setTitle(i18n("feedback.github"));
+            githubLink.setSubtitle(i18n("feedback.papi_community.github.statement"));
+            githubLink.setExternalLink(Metadata.PAPI_ISSUES_URL);
+
+            papiLauncher.getContent().setAll(launcher, author, soystormy, discordLink, githubLink);
+        }
+
+        ComponentList hmclOriginal = new ComponentList();
+        {
+            IconedTwoLineListItem launcher = new IconedTwoLineListItem();
+            launcher.setImage(FXUtils.newBuiltinImage(resolveHiDPIImage("/assets/img/icon-HMCL.png")));
+            launcher.setTitle("Hello Minecraft! Launcher (HMCL)");
+            launcher.setSubtitle(i18n("about.hmcl_original.author.statement"));
+            launcher.setExternalLink(Metadata.PUBLISH_URL);
+
+            IconedTwoLineListItem author = new IconedTwoLineListItem();
+            author.setImage(FXUtils.newBuiltinImage(resolveHiDPIImage("/assets/img/yellow_fish.png")));
             author.setTitle("huanghongxun");
             author.setSubtitle(i18n("about.author.statement"));
+            author.setExternalLink(Metadata.HMCL_BILIBILI_URL);
 
-            about.getContent().setAll(launcher, author);
+            hmclOriginal.getContent().setAll(launcher, author);
         }
 
         ComponentList thanks = loadIconedTwoLineList("/assets/about/thanks.json");
@@ -72,43 +101,79 @@ public final class AboutPage extends SpinnerPane {
 
         ComponentList legal = new ComponentList();
         {
-            var copyright = new LineButton();
-            copyright.setLargeTitle(true);
+            IconedTwoLineListItem copyright = new IconedTwoLineListItem();
             copyright.setTitle(i18n("about.copyright"));
             copyright.setSubtitle(i18n("about.copyright.statement"));
+            copyright.setExternalLink(Metadata.ABOUT_URL);
 
-            var claim = LineButton.createExternalLinkButton(Metadata.EULA_URL);
-            claim.setLargeTitle(true);
+            IconedTwoLineListItem claim = new IconedTwoLineListItem();
             claim.setTitle(i18n("about.claim"));
             claim.setSubtitle(i18n("about.claim.statement"));
+            claim.setExternalLink(Metadata.EULA_URL);
 
-            var openSource = LineButton.createExternalLinkButton("https://github.com/HMCL-dev/HMCL");
-            openSource.setLargeTitle(true);
+            IconedTwoLineListItem openSource = new IconedTwoLineListItem();
             openSource.setTitle(i18n("about.open_source"));
             openSource.setSubtitle(i18n("about.open_source.statement"));
+            openSource.setExternalLink(Metadata.HMCL_GITHUB_URL);
 
             legal.getContent().setAll(copyright, claim, openSource);
         }
 
+        VBox content = new VBox(16);
+        content.setPadding(new Insets(10));
         content.getChildren().setAll(
-                ComponentList.createComponentListTitle(i18n("about")),
-                about,
+                ComponentList.createComponentListTitle(i18n("about.papi_launcher")),
+                papiLauncher,
+
+                ComponentList.createComponentListTitle(i18n("about.hmcl_original")),
+                hmclOriginal,
+
                 ComponentList.createComponentListTitle(i18n("about.thanks_to")),
                 thanks,
+
                 ComponentList.createComponentListTitle(i18n("about.dependency")),
                 deps,
+
                 ComponentList.createComponentListTitle(i18n("about.legal")),
                 legal
         );
+
+
+        ScrollPane scrollPane = new ScrollPane(content);
+        scrollPane.setFitToWidth(true);
+        FXUtils.smoothScrolling(scrollPane);
+        getChildren().setAll(scrollPane);
     }
 
-    private static Image loadImage(String url) {
-        return url.startsWith("/")
-                ? FXUtils.newBuiltinImage(url)
-                : new Image(url);
+    private static String resolveHiDPIImage(String basePath) {
+        if (Platform.isFxApplicationThread()) {
+            try {
+                Screen screen = Screen.getPrimary();
+                if (screen != null) {
+                    double scale = screen.getOutputScaleX();
+                    String suffix = null;
+                    if (scale > 4.0) {
+                        suffix = "@8x";
+                    } else if (scale > 2.0) {
+                        suffix = "@4x";
+                    } else if (scale > 1.0) {
+                        suffix = "@2x";
+                    } else {
+                        return basePath;
+                    }
+                    int dotIndex = basePath.lastIndexOf('.');
+                    if (dotIndex > 0) {
+                        return basePath.substring(0, dotIndex) + suffix + basePath.substring(dotIndex);
+                    }
+                }
+            } catch (Exception e) {
+                // fallback to base path
+            }
+        }
+        return basePath;
     }
 
-    private ComponentList loadIconedTwoLineList(String path) {
+    private static ComponentList loadIconedTwoLineList(String path) {
         ComponentList componentList = new ComponentList();
 
         InputStream input = FXUtils.class.getResourceAsStream(path);
@@ -122,42 +187,29 @@ public final class AboutPage extends SpinnerPane {
 
             for (JsonElement element : array) {
                 JsonObject obj = element.getAsJsonObject();
-
-                var button = new LineButton();
-                button.setLargeTitle(true);
-
-                if (obj.get("externalLink") instanceof JsonPrimitive externalLink) {
-                    button.setTrailingIcon(SVG.OPEN_IN_NEW);
-
-                    String link = externalLink.getAsString();
-                    button.setOnAction(event -> FXUtils.openLink(link));
-                }
+                IconedTwoLineListItem item = new IconedTwoLineListItem();
 
                 if (obj.has("image")) {
-                    JsonElement image = obj.get("image");
-                    if (image.isJsonPrimitive()) {
-                        button.setLeading(loadImage(image.getAsString()));
-                    } else if (image.isJsonObject()) {
-                        holder.add(FXUtils.onWeakChangeAndOperate(Themes.darkModeProperty(), darkMode -> {
-                            button.setLeading(darkMode
-                                    ? loadImage(image.getAsJsonObject().get("dark").getAsString())
-                                    : loadImage(image.getAsJsonObject().get("light").getAsString())
-                            );
-                        }));
-                    }
+                    String image = obj.get("image").getAsString();
+                    item.setImage(image.startsWith("/")
+                            ? FXUtils.newBuiltinImage(resolveHiDPIImage(image))
+                            : new Image(image));
                 }
 
-                if (obj.get("title") instanceof JsonPrimitive title)
-                    button.setTitle(title.getAsString());
-                else if (obj.get("titleLocalized") instanceof JsonPrimitive titleLocalized)
-                    button.setTitle(i18n(titleLocalized.getAsString()));
+                if (obj.has("title"))
+                    item.setTitle(obj.get("title").getAsString());
+                else if (obj.has("titleLocalized"))
+                    item.setTitle(i18n(obj.get("titleLocalized").getAsString()));
 
-                if (obj.get("subtitle") instanceof JsonPrimitive subtitle)
-                    button.setSubtitle(subtitle.getAsString());
-                else if (obj.get("subtitleLocalized") instanceof JsonPrimitive subtitleLocalized)
-                    button.setSubtitle(i18n(subtitleLocalized.getAsString()));
+                if (obj.has("subtitle"))
+                    item.setSubtitle(obj.get("subtitle").getAsString());
+                else if (obj.has("subtitleLocalized"))
+                    item.setSubtitle(i18n(obj.get("subtitleLocalized").getAsString()));
 
-                componentList.getContent().add(button);
+                if (obj.has("externalLink"))
+                    item.setExternalLink(obj.get("externalLink").getAsString());
+
+                componentList.getContent().add(item);
             }
         } catch (IOException | JsonParseException e) {
             LOG.warning("Failed to load list: " + path, e);

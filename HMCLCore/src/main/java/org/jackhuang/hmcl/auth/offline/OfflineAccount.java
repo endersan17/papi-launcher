@@ -17,12 +17,8 @@
  */
 package org.jackhuang.hmcl.auth.offline;
 
-import com.google.gson.JsonNull;
-import com.google.gson.JsonObject;
 import javafx.beans.binding.ObjectBinding;
-import org.glavo.uuid.UUIDs;
 import org.jackhuang.hmcl.auth.Account;
-import org.jackhuang.hmcl.auth.AccountID;
 import org.jackhuang.hmcl.auth.AuthInfo;
 import org.jackhuang.hmcl.auth.AuthenticationException;
 import org.jackhuang.hmcl.auth.authlibinjector.AuthlibInjectorArtifactInfo;
@@ -34,6 +30,7 @@ import org.jackhuang.hmcl.game.Arguments;
 import org.jackhuang.hmcl.game.LaunchOptions;
 import org.jackhuang.hmcl.util.StringUtils;
 import org.jackhuang.hmcl.util.ToStringBuilder;
+import org.jackhuang.hmcl.util.gson.UUIDTypeAdapter;
 
 import java.io.IOException;
 import java.util.Map;
@@ -44,6 +41,8 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 
 import static java.util.Objects.requireNonNull;
+import static org.jackhuang.hmcl.util.Lang.mapOf;
+import static org.jackhuang.hmcl.util.Pair.pair;
 
 /**
  *
@@ -52,24 +51,18 @@ import static java.util.Objects.requireNonNull;
 public class OfflineAccount extends Account {
 
     private final AuthlibInjectorArtifactProvider downloader;
-    private final String profileName;
-    private final UUID profileID;
+    private final String username;
+    private final UUID uuid;
     private Skin skin;
 
-    protected OfflineAccount(
-            AccountID accountID,
-            AuthlibInjectorArtifactProvider downloader,
-            String profileName,
-            UUID profileID,
-            Skin skin) {
-        super(accountID);
+    protected OfflineAccount(AuthlibInjectorArtifactProvider downloader, String username, UUID uuid, Skin skin) {
         this.downloader = requireNonNull(downloader);
-        this.profileName = requireNonNull(profileName);
-        this.profileID = requireNonNull(profileID);
+        this.username = requireNonNull(username);
+        this.uuid = requireNonNull(uuid);
         this.skin = skin;
 
-        if (StringUtils.isBlank(profileName)) {
-            throw new IllegalArgumentException("Profile name cannot be blank");
+        if (StringUtils.isBlank(username)) {
+            throw new IllegalArgumentException("Username cannot be blank");
         }
     }
 
@@ -78,13 +71,23 @@ public class OfflineAccount extends Account {
     }
 
     @Override
-    public UUID getProfileID() {
-        return profileID;
+    public UUID getUUID() {
+        return uuid;
     }
 
     @Override
-    public String getProfileName() {
-        return profileName;
+    public String getUsername() {
+        return username;
+    }
+
+    @Override
+    public String getCharacter() {
+        return username;
+    }
+
+    @Override
+    public String getIdentifier() {
+        return username + ":" + username;
     }
 
     public Skin getSkin() {
@@ -100,14 +103,10 @@ public class OfflineAccount extends Account {
         return skin != null && skin.getType() != Skin.Type.DEFAULT;
     }
 
-    public AuthInfo logInWithoutSkin() throws AuthenticationException {
-        // Using "legacy" user type here because "mojang" user type may cause "invalid session token" or "disconnected" when connecting to a game server.
-        return new AuthInfo(profileName, profileID, UUIDs.toCompactString(UUID.randomUUID()), AuthInfo.USER_TYPE_MSA, "{}");
-    }
-
     @Override
     public AuthInfo logIn() throws AuthenticationException {
-        AuthInfo authInfo = logInWithoutSkin();
+        // Using "legacy" user type here because "mojang" user type may cause "invalid session token" or "disconnected" when connecting to a game server.
+        AuthInfo authInfo = new AuthInfo(username, uuid, UUIDTypeAdapter.fromUUID(UUID.randomUUID()), AuthInfo.USER_TYPE_MSA, "{}");
 
         if (loadAuthlibInjector(skin)) {
             CompletableFuture<AuthlibInjectorArtifactInfo> artifactTask = CompletableFuture.supplyAsync(() -> {
@@ -160,8 +159,8 @@ public class OfflineAccount extends Account {
             server.start();
 
             try {
-                server.addCharacter(new YggdrasilServer.Character(profileID, profileName,
-                        skin != null ? skin.load(profileName).run() : null));
+                server.addCharacter(new YggdrasilServer.Character(uuid, username,
+                        skin != null ? skin.load(username).run() : null));
             } catch (IOException e) {
                 // ignore
             } catch (Exception e) {
@@ -189,17 +188,12 @@ public class OfflineAccount extends Account {
     }
 
     @Override
-    public void writeMetadata(JsonObject metadata) {
-        super.writeMetadata(metadata);
-        metadata.addProperty("profileID", profileID.toString());
-        metadata.addProperty("profileName", profileName);
-        if (skin == null) {
-            metadata.add("skin", JsonNull.INSTANCE);
-        } else {
-            JsonObject skinStorage = new JsonObject();
-            skin.writeStorage(skinStorage);
-            metadata.add("skin", skinStorage);
-        }
+    public Map<Object, Object> toStorage() {
+        return mapOf(
+                pair("uuid", UUIDTypeAdapter.fromUUID(uuid)),
+                pair("username", username),
+                pair("skin", skin == null ? null : skin.toStorage())
+        );
     }
 
     @Override
@@ -210,9 +204,21 @@ public class OfflineAccount extends Account {
     @Override
     public String toString() {
         return new ToStringBuilder(this)
-                .append("accountID", getAccountID())
-                .append("profileName", profileName)
-                .append("profileID", profileID)
+                .append("username", username)
+                .append("uuid", uuid)
                 .toString();
+    }
+
+    @Override
+    public int hashCode() {
+        return username.hashCode();
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (!(obj instanceof OfflineAccount))
+            return false;
+        OfflineAccount another = (OfflineAccount) obj;
+        return isPortable() == another.isPortable() && username.equals(another.username);
     }
 }

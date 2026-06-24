@@ -22,17 +22,17 @@ import org.jackhuang.hmcl.util.Lang;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
-/// The managed process.
-///
-/// @author huangyuhui
-/// <!-- @see org.jackhuang.hmcl.launch.ExitWaiter -->
-/// @see org.jackhuang.hmcl.launch.StreamPump
+/**
+ * The managed process.
+ *
+ * @author huangyuhui
+ * @see org.jackhuang.hmcl.launch.ExitWaiter
+ * @see org.jackhuang.hmcl.launch.StreamPump
+ */
 public final class ManagedProcess {
-    private final ReentrantLock lock = new ReentrantLock();
     private final Process process;
     private final List<String> commands;
     private final String classpath;
@@ -54,7 +54,7 @@ public final class ManagedProcess {
      */
     public ManagedProcess(Process process, List<String> commands) {
         this.process = process;
-        this.commands = List.copyOf(commands);
+        this.commands = Collections.unmodifiableList(new ArrayList<>(commands));
         this.classpath = null;
     }
 
@@ -67,7 +67,7 @@ public final class ManagedProcess {
      */
     public ManagedProcess(Process process, List<String> commands, String classpath) {
         this.process = process;
-        this.commands = List.copyOf(commands);
+        this.commands = Collections.unmodifiableList(new ArrayList<>(commands));
         this.classpath = classpath;
     }
 
@@ -111,30 +111,20 @@ public final class ManagedProcess {
      *
      * @see #addLine
      */
-    public List<String> getLines(Predicate<String> lineFilter) {
-        lock.lock();
-        try {
-            if (lineFilter == null)
-                return List.copyOf(lines);
+    public synchronized List<String> getLines(Predicate<String> lineFilter) {
+        if (lineFilter == null)
+            return Collections.unmodifiableList(Arrays.asList(lines.toArray(new String[0])));
 
-            ArrayList<String> res = new ArrayList<>();
-            for (String line : this.lines) {
-                if (lineFilter.test(line))
-                    res.add(line);
-            }
-            return Collections.unmodifiableList(res);
-        } finally {
-            lock.unlock();
+        ArrayList<String> res = new ArrayList<>();
+        for (String line : this.lines) {
+            if (lineFilter.test(line))
+                res.add(line);
         }
+        return Collections.unmodifiableList(res);
     }
 
-    public void addLine(String line) {
-        lock.lock();
-        try {
-            lines.add(line);
-        } finally {
-            lock.unlock();
-        }
+    public synchronized void addLine(String line) {
+        lines.add(line);
     }
 
     /**
@@ -143,20 +133,15 @@ public final class ManagedProcess {
      * If a thread is monitoring this raw process,
      * you are required to add the instance by this method.
      */
-    public void addRelatedThread(Thread thread) {
-        lock.lock();
-        try {
-            relatedThreads.add(thread);
-        } finally {
-            lock.unlock();
-        }
+    public synchronized void addRelatedThread(Thread thread) {
+        relatedThreads.add(thread);
     }
 
-    public void pumpInputStream(Consumer<String> onLogLine) {
+    public synchronized void pumpInputStream(Consumer<String> onLogLine) {
         addRelatedThread(Lang.thread(new StreamPump(process.getInputStream(), onLogLine, OperatingSystem.NATIVE_CHARSET), "ProcessInputStreamPump", true));
     }
 
-    public void pumpErrorStream(Consumer<String> onLogLine) {
+    public synchronized void pumpErrorStream(Consumer<String> onLogLine) {
         addRelatedThread(Lang.thread(new StreamPump(process.getErrorStream(), onLogLine, OperatingSystem.NATIVE_CHARSET), "ProcessErrorStreamPump", true));
     }
 
@@ -187,13 +172,8 @@ public final class ManagedProcess {
         destroyRelatedThreads();
     }
 
-    public void destroyRelatedThreads() {
-        lock.lock();
-        try {
-            relatedThreads.forEach(Thread::interrupt);
-        } finally {
-            lock.unlock();
-        }
+    public synchronized void destroyRelatedThreads() {
+        relatedThreads.forEach(Thread::interrupt);
     }
 
     @Override

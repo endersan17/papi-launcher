@@ -57,6 +57,11 @@ public final class ForgeBMCLVersionList extends VersionList<ForgeRemoteVersion> 
     }
 
     @Override
+    public Task<?> loadAsync() {
+        throw new UnsupportedOperationException("ForgeBMCLVersionList does not support loading the entire Forge remote version list.");
+    }
+
+    @Override
     public Task<?> refreshAsync() {
         throw new UnsupportedOperationException("ForgeBMCLVersionList does not support loading the entire Forge remote version list.");
     }

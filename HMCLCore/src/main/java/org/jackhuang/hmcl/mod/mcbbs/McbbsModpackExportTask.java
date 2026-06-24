@@ -47,22 +47,16 @@ public class McbbsModpackExportTask extends Task<Void> {
     private final DefaultGameRepository repository;
     private final String version;
     private final ModpackExportInfo info;
-    private final Path modpackFile;
+    private final File modpackFile;
 
-    public McbbsModpackExportTask(DefaultGameRepository repository, String version, ModpackExportInfo info, Path modpackFile) {
+    public McbbsModpackExportTask(DefaultGameRepository repository, String version, ModpackExportInfo info, File modpackFile) {
         this.repository = repository;
         this.version = version;
         this.info = info.validate();
         this.modpackFile = modpackFile;
 
         onDone().register(event -> {
-            if (event.isFailed()) {
-                try {
-                    Files.deleteIfExists(modpackFile);
-                } catch (IOException e) {
-                    LOG.warning("Failed to delete modpack file: " + modpackFile, e);
-                }
-            }
+            if (event.isFailed()) modpackFile.delete();
         });
     }
 
@@ -72,8 +66,8 @@ public class McbbsModpackExportTask extends Task<Void> {
         blackList.add(version + ".jar");
         blackList.add(version + ".json");
         LOG.info("Compressing game files without some files in blacklist, including files or directories: usernamecache.json, asm, logs, backups, versions, assets, usercache.json, libraries, crash-reports, launcher_profiles.json, NVIDIA, TCNodeTracker");
-        try (var zip = new Zipper(modpackFile)) {
-            Path runDirectory = repository.getRunDirectory(version);
+        try (Zipper zip = new Zipper(modpackFile.toPath())) {
+            Path runDirectory = repository.getRunDirectory(version).toPath();
             List<McbbsModpackManifest.File> files = new ArrayList<>();
             zip.putDirectory(runDirectory, "overrides", path -> {
                 if (Modpack.acceptFile(path, blackList, info.getWhitelist())) {
@@ -109,8 +103,6 @@ public class McbbsModpackExportTask extends Task<Void> {
                     addons.add(new McbbsModpackManifest.Addon(FABRIC.getPatchId(), fabricVersion)));
             analyzer.getVersion(QUILT).ifPresent(quiltVersion ->
                     addons.add(new McbbsModpackManifest.Addon(QUILT.getPatchId(), quiltVersion)));
-            analyzer.getVersion(LEGACY_FABRIC).ifPresent(legacyfabricVersion ->
-                    addons.add(new McbbsModpackManifest.Addon(LEGACY_FABRIC.getPatchId(), legacyfabricVersion)));
 
             List<Library> libraries = new ArrayList<>();
             // TODO libraries
@@ -143,7 +135,6 @@ public class McbbsModpackExportTask extends Task<Void> {
             .requireAuthlibInjectorServer()
             .requireJavaArguments()
             .requireLaunchArguments()
-            .requireOrigins()
-            .requireAuthor();
+            .requireOrigins();
 
 }

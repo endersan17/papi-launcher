@@ -40,10 +40,7 @@ public final class PaintAdapter extends TypeAdapter<Paint> {
             int green = (int) Math.round(color.getGreen() * 255.);
             int blue = (int) Math.round(color.getBlue() * 255.);
             int opacity = (int) Math.round(color.getOpacity() * 255.);
-            if (opacity < 255)
-                out.value(String.format("#%02x%02x%02x%02x", red, green, blue, opacity));
-            else
-                out.value(String.format("#%02x%02x%02x", red, green, blue));
+            out.value(String.format("#%02x%02x%02x%02x", red, green, blue, opacity));
         } else if (value instanceof LinearGradient
                 || value instanceof RadialGradient) {
             out.value(value.toString());

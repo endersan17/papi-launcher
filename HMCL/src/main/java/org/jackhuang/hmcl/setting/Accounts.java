@@ -17,11 +17,11 @@
  */
 package org.jackhuang.hmcl.setting;
 
-import com.google.gson.JsonObject;
 import javafx.beans.InvalidationListener;
 import javafx.beans.Observable;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
+import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
 import org.jackhuang.hmcl.Metadata;
@@ -35,27 +35,28 @@ import org.jackhuang.hmcl.auth.offline.OfflineAccountFactory;
 import org.jackhuang.hmcl.auth.yggdrasil.RemoteAuthenticationException;
 import org.jackhuang.hmcl.game.OAuthServer;
 import org.jackhuang.hmcl.task.Schedulers;
-import org.jackhuang.hmcl.util.gson.JsonUtils;
+import org.jackhuang.hmcl.util.FileSaver;
 import org.jackhuang.hmcl.util.io.JarUtils;
 import org.jackhuang.hmcl.util.skin.InvalidSkinException;
-import org.jetbrains.annotations.Nullable;
 
 import javax.net.ssl.SSLException;
 import java.io.IOException;
+import java.io.Reader;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 
 import static java.util.stream.Collectors.toList;
 import static javafx.collections.FXCollections.observableArrayList;
-import static org.jackhuang.hmcl.setting.SettingsManager.settings;
-import static org.jackhuang.hmcl.setting.SettingsManager.getAccountMetadataRecords;
-import static org.jackhuang.hmcl.setting.SettingsManager.getAuthlibInjectorServers;
-import static org.jackhuang.hmcl.setting.SettingsManager.getUserAccountMetadataRecords;
-import static org.jackhuang.hmcl.setting.SettingsManager.userSettings;
+import static org.jackhuang.hmcl.setting.ConfigHolder.config;
+import static org.jackhuang.hmcl.setting.ConfigHolder.globalConfig;
 import static org.jackhuang.hmcl.ui.FXUtils.onInvalidating;
 import static org.jackhuang.hmcl.util.Lang.immutableListOf;
 import static org.jackhuang.hmcl.util.Lang.mapOf;
 import static org.jackhuang.hmcl.util.Pair.pair;
+import static org.jackhuang.hmcl.util.gson.JsonUtils.listTypeOf;
+import static org.jackhuang.hmcl.util.gson.JsonUtils.mapTypeOf;
 import static org.jackhuang.hmcl.util.i18n.I18n.i18n;
 import static org.jackhuang.hmcl.util.logging.Logger.LOG;
 
@@ -119,6 +120,9 @@ public final class Accounts {
             throw new IllegalArgumentException("Failed to determine account type: " + account);
     }
 
+    private static final String GLOBAL_PREFIX = "$GLOBAL:";
+    private static final ObservableList<Map<Object, Object>> globalAccountStorages = FXCollections.observableArrayList();
+
     private static final ObservableList<Account> accounts = observableArrayList(account -> new Observable[]{account});
     private static final ObjectProperty<Account> selectedAccount = new SimpleObjectProperty<>(Accounts.class, "selectedAccount");
 
@@ -127,219 +131,110 @@ public final class Accounts {
      */
     private static boolean initialized = false;
 
-    private static SerializedAccount serializeAccount(Account account) {
-        JsonObject metadata = new JsonObject();
-        metadata.addProperty("type", getLoginType(getAccountFactory(account)));
-        account.writeMetadata(metadata);
-        JsonObject privateData = new JsonObject();
-        account.writePrivateData(privateData);
-        return new SerializedAccount(metadata, privateData);
+    private static Map<Object, Object> getAccountStorage(Account account) {
+        Map<Object, Object> storage = account.toStorage();
+        storage.put("type", getLoginType(getAccountFactory(account)));
+        return storage;
     }
 
-    /// Ensures account IDs are unique across local and shared account metadata records before accounts are instantiated.
-    private static AccountIDNormalization ensureUniqueAccountIDs() {
-        Set<String> usedAccountIDs = new HashSet<>();
-        boolean localChanged = LegacyConfigMigrator.assignAccountIDs(
-                SettingsManager.gameAccounts(),
-                usedAccountIDs,
-                false);
-        boolean sharedChanged = LegacyConfigMigrator.assignAccountIDs(
-                SettingsManager.userGameAccounts(),
-                usedAccountIDs,
-                true);
-        return new AccountIDNormalization(localChanged, sharedChanged);
-    }
-
-    /// Result of normalizing account IDs across loaded metadata stores.
-    ///
-    /// @param localChanged whether the per-workspace account metadata changed
-    /// @param sharedChanged whether the shared account metadata changed
-    private record AccountIDNormalization(boolean localChanged, boolean sharedChanged) {
-    }
-
-    /// Returns account IDs from metadata records.
-    ///
-    /// @param first the first metadata record list
-    /// @param second the second metadata record list
-    /// @return account IDs found in the metadata records
-    private static List<AccountID> getAccountIDs(List<JsonObject> first, List<JsonObject> second) {
-        ArrayList<AccountID> accountIDs = new ArrayList<>(first.size() + second.size());
-        addAccountIDs(accountIDs, first);
-        addAccountIDs(accountIDs, second);
-        return accountIDs;
-    }
-
-    /// Adds account IDs from metadata records to a target list.
-    ///
-    /// @param accountIDs the target account ID list
-    /// @param metadataRecords the metadata records to read
-    private static void addAccountIDs(List<AccountID> accountIDs, List<JsonObject> metadataRecords) {
-        for (JsonObject metadata : metadataRecords) {
-            @Nullable AccountID accountID = Account.getAccountID(metadata);
-            if (accountID != null && !accountIDs.contains(accountID)) {
-                accountIDs.add(accountID);
-            }
-        }
-    }
-
-    private static void updateAccountMetadataRecords() {
-        // don't update the underlying account records before data loading is completed
+    private static void updateAccountStorages() {
+        // don't update the underlying storage before data loading is completed
         // otherwise it might cause data loss
         if (!initialized)
             return;
-        ArrayList<JsonObject> globalMetadata = new ArrayList<>();
-        LinkedHashMap<AccountID, JsonObject> globalPrivateData = new LinkedHashMap<>();
-        ArrayList<JsonObject> portableMetadata = new ArrayList<>();
-        LinkedHashMap<AccountID, JsonObject> portablePrivateData = new LinkedHashMap<>();
+        // update storage
+
+        ArrayList<Map<Object, Object>> global = new ArrayList<>();
+        ArrayList<Map<Object, Object>> portable = new ArrayList<>();
 
         for (Account account : accounts) {
-            SerializedAccount serialized = serializeAccount(account);
-            if (account.isPortable()) {
-                portableMetadata.add(serialized.metadata());
-                if (!serialized.privateData().isEmpty()) {
-                    portablePrivateData.put(account.getAccountID(), serialized.privateData());
-                }
-            } else {
-                globalMetadata.add(serialized.metadata());
-                if (!serialized.privateData().isEmpty()) {
-                    globalPrivateData.put(account.getAccountID(), serialized.privateData());
-                }
+            Map<Object, Object> storage = getAccountStorage(account);
+            if (account.isPortable())
+                portable.add(storage);
+            else
+                global.add(storage);
+        }
+
+        if (!global.equals(globalAccountStorages))
+            globalAccountStorages.setAll(global);
+        if (!portable.equals(config().getAccountStorages()))
+            config().getAccountStorages().setAll(portable);
+    }
+
+    private static void loadGlobalAccountStorages() {
+        Path globalAccountsFile = Metadata.HMCL_GLOBAL_DIRECTORY.resolve("accounts.json");
+        if (Files.exists(globalAccountsFile)) {
+            try (Reader reader = Files.newBufferedReader(globalAccountsFile)) {
+                globalAccountStorages.setAll(Config.CONFIG_GSON.fromJson(reader, listTypeOf(mapTypeOf(Object.class, Object.class))));
+            } catch (Throwable e) {
+                LOG.warning("Failed to load global accounts", e);
             }
         }
 
-        List<AccountID> retainedAccountIDs = getAccountIDs(globalMetadata, portableMetadata);
-        if (!SettingsManager.isUserGameAccountsReadOnly())
-            SettingsManager.updateUserGameAccounts(globalMetadata, globalPrivateData, retainedAccountIDs);
-        if (!SettingsManager.isGameAccountsReadOnly())
-            SettingsManager.updateGameAccounts(portableMetadata, portablePrivateData, retainedAccountIDs);
+        globalAccountStorages.addListener(onInvalidating(() ->
+                FileSaver.save(globalAccountsFile, Config.CONFIG_GSON.toJson(globalAccountStorages))));
     }
 
-    /// Returns whether the account metadata and credential files selected by the portability flag are read-only.
-    ///
-    /// @param portable whether the account is stored in the local account file
-    public static boolean isAccountFilesReadOnly(boolean portable) {
-        return portable ? SettingsManager.isGameAccountsReadOnly() : SettingsManager.isUserGameAccountsReadOnly();
-    }
-
-    /// Returns whether the files containing the given account are read-only.
-    public static boolean isAccountFilesReadOnly(Account account) {
-        return isAccountFilesReadOnly(account.isPortable());
-    }
-
-    /// Returns whether the given account may be removed from its current account files.
-    public static boolean canRemoveAccount(Account account) {
-        return !isAccountFilesReadOnly(account);
-    }
-
-    /// Returns whether the given account may be moved between local and user account files.
-    public static boolean canMoveAccount(Account account) {
-        return !SettingsManager.isGameAccountsReadOnly() && !SettingsManager.isUserGameAccountsReadOnly();
-    }
-
-    /// Backs up and overwrites the account metadata and credential files selected by the portability flag.
-    ///
-    /// @param portable whether the target account files are local
-    /// @throws IOException if saving either file fails
-    public static void forceOverwriteAccountFiles(boolean portable) throws IOException {
-        if (portable) {
-            SettingsManager.forceOverwriteGameAccounts();
-        } else {
-            SettingsManager.forceOverwriteUserGameAccounts();
-        }
-    }
-
-    /// Backs up and overwrites the account files containing the given account.
-    ///
-    /// @throws IOException if saving either file fails
-    public static void forceOverwriteAccountFiles(Account account) throws IOException {
-        forceOverwriteAccountFiles(account.isPortable());
-    }
-
-    /// Backs up and overwrites both local and user account metadata and credential files.
-    ///
-    /// @throws IOException if saving either file fails
-    public static void forceOverwriteAccountFiles() throws IOException {
-        if (SettingsManager.isGameAccountsReadOnly()) {
-            SettingsManager.forceOverwriteGameAccounts();
-        }
-        if (SettingsManager.isUserGameAccountsReadOnly()) {
-            SettingsManager.forceOverwriteUserGameAccounts();
-        }
-    }
-
-    private static Account parseAccount(JsonObject record, boolean portable) {
-        AccountFactory<?> factory = type2factory.get(JsonUtils.getString(record, "type"));
+    private static Account parseAccount(Map<Object, Object> storage) {
+        AccountFactory<?> factory = type2factory.get(storage.get("type"));
         if (factory == null) {
-            LOG.warning("Unrecognized account type: " + describeAccountRecord(record));
+            LOG.warning("Unrecognized account type: " + storage);
             return null;
         }
 
         try {
-            AccountID accountID = Account.readAccountID(record);
-            return factory.fromStorage(record, SettingsManager.getAccountPrivateData(accountID, portable));
+            return factory.fromStorage(storage);
         } catch (Exception e) {
-            LOG.warning("Failed to load account: " + describeAccountRecord(record), e);
+            LOG.warning("Failed to load account: " + storage, e);
             return null;
         }
     }
 
-    /// Serialized account metadata and private data.
-    ///
-    /// @param metadata public metadata stored in `accounts.json`
-    /// @param privateData private account data stored in account private data
-    private record SerializedAccount(JsonObject metadata, JsonObject privateData) {
-    }
-
-    /// Returns a safe account record description for diagnostics.
-    private static String describeAccountRecord(JsonObject record) {
-        AccountID accountID = Account.getAccountID(record);
-        if (accountID != null) {
-            return accountID.toString();
-        }
-
-        String type = JsonUtils.getString(record, "type");
-        return type != null ? "{type=" + type + "}" : "<unknown>";
-    }
-
-    /// Called when it's ready to load accounts from [SettingsManager#settings()].
-    public static void init() {
+    /**
+     * Called when it's ready to load accounts from {@link ConfigHolder#config()}.
+     */
+    static void init() {
         if (initialized)
             throw new IllegalStateException("Already initialized");
 
-        AccountIDNormalization accountIDNormalization = ensureUniqueAccountIDs();
-        if (accountIDNormalization.localChanged()) {
-            SettingsManager.saveGameAccountMetadataRecords();
-        }
-        if (accountIDNormalization.sharedChanged()) {
-            SettingsManager.saveUserGameAccountMetadataRecords();
-        }
+        loadGlobalAccountStorages();
 
         // load accounts
         Account selected = null;
-        for (JsonObject record : getAccountMetadataRecords()) {
-            Account account = parseAccount(record, true);
+        for (Map<Object, Object> storage : config().getAccountStorages()) {
+            Account account = parseAccount(storage);
             if (account != null) {
                 account.setPortable(true);
                 accounts.add(account);
-                if (JsonUtils.getBoolean(record, "selected", false)) {
+                if (Boolean.TRUE.equals(storage.get("selected"))) {
                     selected = account;
                 }
             }
         }
 
-        for (JsonObject record : getUserAccountMetadataRecords()) {
-            Account account = parseAccount(record, false);
+        for (Map<Object, Object> storage : globalAccountStorages) {
+            Account account = parseAccount(storage);
             if (account != null) {
                 accounts.add(account);
             }
         }
 
-        AccountID selectedAccountID = settings().selectedAccountProperty().get();
-        if (selected == null && selectedAccountID != null) {
+        String selectedAccountIdentifier = config().getSelectedAccount();
+        if (selected == null && selectedAccountIdentifier != null) {
+            boolean portable = true;
+            if (selectedAccountIdentifier.startsWith(GLOBAL_PREFIX)) {
+                portable = false;
+                selectedAccountIdentifier = selectedAccountIdentifier.substring(GLOBAL_PREFIX.length());
+            }
+
             for (Account account : accounts) {
-                if (account.getAccountID().equals(selectedAccountID)) {
-                    selected = account;
-                    break;
+                if (selectedAccountIdentifier.equals(account.getIdentifier())) {
+                    if (portable == account.isPortable()) {
+                        selected = account;
+                        break;
+                    } else if (selected == null) {
+                        selected = account;
+                    }
                 }
             }
         }
@@ -348,18 +243,15 @@ public final class Accounts {
             selected = accounts.get(0);
         }
 
-        if (!SettingsManager.isUserSettingsReadOnly()
-                && !SettingsManager.userSettings().enableOfflineAccountProperty().get())
+        if (!globalConfig().isEnableOfflineAccount())
             for (Account account : accounts) {
                 if (account instanceof MicrosoftAccount) {
-                    UserSettings userSettings = userSettings();
-                    userSettings.enableOfflineAccountProperty().set(true);
+                    globalConfig().setEnableOfflineAccount(true);
                     break;
                 }
             }
 
-        if (!SettingsManager.isUserSettingsReadOnly()
-                && !SettingsManager.userSettings().enableOfflineAccountProperty().get())
+        if (!globalConfig().isEnableOfflineAccount())
             accounts.addListener(new ListChangeListener<Account>() {
                 @Override
                 public void onChanged(Change<? extends Account> change) {
@@ -367,8 +259,7 @@ public final class Accounts {
                         for (Account account : change.getAddedSubList()) {
                             if (account instanceof MicrosoftAccount) {
                                 accounts.removeListener(this);
-                                UserSettings userSettings = userSettings();
-                                userSettings.enableOfflineAccountProperty().set(true);
+                                globalConfig().setEnableOfflineAccount(true);
                                 return;
                             }
                         }
@@ -380,7 +271,7 @@ public final class Accounts {
 
         InvalidationListener listener = o -> {
             // this method first checks whether the current selection is valid
-            // if it's valid, the underlying account records will be updated
+            // if it's valid, the underlying storage will be updated
             // otherwise, the first account will be selected as an alternative(or null if accounts is empty)
             Account account = selectedAccount.get();
             if (accounts.isEmpty()) {
@@ -403,16 +294,24 @@ public final class Accounts {
         selectedAccount.addListener(onInvalidating(() -> {
             Account account = selectedAccount.get();
             if (account != null)
-                settings().selectedAccountProperty().set(account.getAccountID());
+                config().setSelectedAccount(account.isPortable() ? account.getIdentifier() : GLOBAL_PREFIX + account.getIdentifier());
             else
-                settings().selectedAccountProperty().set(null);
+                config().setSelectedAccount(null);
         }));
         accounts.addListener(listener);
-        accounts.addListener(onInvalidating(Accounts::updateAccountMetadataRecords));
+        accounts.addListener(onInvalidating(Accounts::updateAccountStorages));
 
         initialized = true;
 
-        getAuthlibInjectorServers().addListener(onInvalidating(Accounts::removeDanglingAuthlibInjectorAccounts));
+        config().getAuthlibInjectorServers().addListener(onInvalidating(Accounts::removeDanglingAuthlibInjectorAccounts));
+
+        // Migration: remove LittleSkin from persisted auth servers
+        config().getAuthlibInjectorServers().removeIf(
+                server -> "https://littleskin.cn/api/yggdrasil/".equals(server.getUrl()));
+
+        // Migration: remove default Ely.by from persisted auth servers
+        config().getAuthlibInjectorServers().removeIf(
+                server -> "https://authserver.ely.by/api/authlib-injector".equals(server.getUrl()));
 
         if (selected != null) {
             Account finalSelected = selected;
@@ -425,7 +324,7 @@ public final class Accounts {
             });
         }
 
-        for (AuthlibInjectorServer server : getAuthlibInjectorServers()) {
+        for (AuthlibInjectorServer server : config().getAuthlibInjectorServers()) {
             if (selected instanceof AuthlibInjectorAccount && ((AuthlibInjectorAccount) selected).getServer() == server)
                 continue;
             Schedulers.io().execute(() -> {
@@ -472,12 +371,12 @@ public final class Accounts {
     }
 
     private static AuthlibInjectorServer getOrCreateAuthlibInjectorServer(String url) {
-        return getAuthlibInjectorServers().stream()
+        return config().getAuthlibInjectorServers().stream()
                 .filter(server -> url.equals(server.getUrl()))
                 .findFirst()
                 .orElseGet(() -> {
                     AuthlibInjectorServer server = new AuthlibInjectorServer(url);
-                    getAuthlibInjectorServers().add(server);
+                    config().getAuthlibInjectorServers().add(server);
                     return server;
                 });
     }
@@ -490,8 +389,7 @@ public final class Accounts {
         accounts.stream()
                 .filter(AuthlibInjectorAccount.class::isInstance)
                 .map(AuthlibInjectorAccount.class::cast)
-                .filter(it -> !getAuthlibInjectorServers().contains(it.getServer()))
-                .filter(Accounts::canRemoveAccount)
+                .filter(it -> !config().getAuthlibInjectorServers().contains(it.getServer()))
                 .collect(toList())
                 .forEach(accounts::remove);
     }
@@ -514,12 +412,6 @@ public final class Accounts {
             return i18n("account.failed.no_character");
         } else if (exception instanceof ServerDisconnectException) {
             if (exception.getCause() instanceof SSLException) {
-                if (exception.getCause().getMessage() != null && exception.getCause().getMessage().contains("Remote host terminated")) {
-                    return i18n("account.failed.connect_authentication_server");
-                }
-                if (exception.getCause().getMessage() != null && (exception.getCause().getMessage().contains("No name matching") || exception.getCause().getMessage().contains("No subject alternative DNS name matching"))) {
-                    return i18n("account.failed.dns");
-                }
                 return i18n("account.failed.ssl");
             } else {
                 return i18n("account.failed.connect_authentication_server");
@@ -568,12 +460,10 @@ public final class Accounts {
             }
         } else if (exception instanceof MicrosoftService.XBox400Exception) {
             return i18n("account.methods.microsoft.error.wrong_verify_method");
-        } else if (exception instanceof MicrosoftService.MinecraftJavaEditionLicenseNotFoundException) {
-            return i18n("account.methods.microsoft.error.no_license");
-        } else if (exception instanceof MicrosoftService.MinecraftJavaEditionProfileNotFoundException) {
+        } else if (exception instanceof MicrosoftService.NoMinecraftJavaEditionProfileException) {
             return i18n("account.methods.microsoft.error.no_character");
         } else if (exception instanceof MicrosoftService.NoXuiException) {
-            return i18n("account.methods.microsoft.error.add_family");
+            return i18n("account.methods.microsoft.error.add_family_probably");
         } else if (exception instanceof OAuthServer.MicrosoftAuthenticationNotSupportedException) {
             return i18n("account.methods.microsoft.snapshot");
         } else if (exception instanceof OAuthAccount.WrongAccountException) {

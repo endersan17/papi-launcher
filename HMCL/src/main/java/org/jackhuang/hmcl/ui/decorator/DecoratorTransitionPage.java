@@ -17,7 +17,6 @@
  */
 package org.jackhuang.hmcl.ui.decorator;
 
-import javafx.animation.Interpolator;
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.*;
 import javafx.scene.Node;
@@ -25,7 +24,7 @@ import javafx.scene.control.Control;
 import javafx.scene.control.Skin;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
-import javafx.util.Duration;
+import org.jackhuang.hmcl.ui.animation.AnimationProducer;
 import org.jackhuang.hmcl.ui.animation.TransitionPane;
 import org.jackhuang.hmcl.ui.wizard.Refreshable;
 
@@ -37,8 +36,8 @@ public abstract class DecoratorTransitionPage extends Control implements Decorat
     private Node currentPage;
     protected final TransitionPane transitionPane = new TransitionPane();
 
-    protected void navigate(Node page, TransitionPane.AnimationProducer animation, Duration duration, Interpolator interpolator) {
-        transitionPane.setContent(currentPage = page, animation, duration, interpolator);
+    protected void navigate(Node page, AnimationProducer animation) {
+        transitionPane.setContent(currentPage = page, animation);
     }
 
     protected void onNavigating(Node from) {

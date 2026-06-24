@@ -40,26 +40,14 @@ public final class SwingUtils {
     }
 
     public static void showInfoDialog(Object message) {
-        showInfoDialog(message, "Info");
-    }
-
-    public static void showInfoDialog(Object message, String title) {
-        JOptionPane.showMessageDialog(null, message, title, JOptionPane.INFORMATION_MESSAGE);
+        JOptionPane.showMessageDialog(null, message, "Info", JOptionPane.INFORMATION_MESSAGE);
     }
 
     public static void showWarningDialog(Object message) {
-        showWarningDialog(message, "Warning");
-    }
-
-    public static void showWarningDialog(Object message, String title) {
-        JOptionPane.showMessageDialog(null, message, title, JOptionPane.WARNING_MESSAGE);
+        JOptionPane.showMessageDialog(null, message, "Warning", JOptionPane.WARNING_MESSAGE);
     }
 
     public static void showErrorDialog(Object message) {
-        showErrorDialog(message, "Error");
-    }
-
-    public static void showErrorDialog(Object message, String title) {
-        JOptionPane.showMessageDialog(null, message, title, JOptionPane.ERROR_MESSAGE);
+        JOptionPane.showMessageDialog(null, message, "Error", JOptionPane.ERROR_MESSAGE);
     }
 }

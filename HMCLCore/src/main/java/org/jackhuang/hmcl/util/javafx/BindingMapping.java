@@ -25,7 +25,6 @@ import javafx.beans.value.ObservableValue;
 
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -145,7 +144,6 @@ public abstract class BindingMapping<T, U> extends ObjectBinding<U> {
 
     private static final class AsyncMappedBinding<T, U> extends BindingMapping<T, U> {
 
-        private final ReentrantLock lock = new ReentrantLock();
         private boolean initialized = false;
         private T prev;
         private U value;
@@ -161,16 +159,13 @@ public abstract class BindingMapping<T, U> extends ObjectBinding<U> {
         }
 
         private void tryUpdateValue(T currentPrev) {
-            lock.lock();
-            try {
+            synchronized (this) {
                 if ((initialized && Objects.equals(prev, currentPrev))
                         || isComputing(currentPrev)) {
                     return;
                 }
                 computing = true;
                 computingPrev = currentPrev;
-            } finally {
-                lock.unlock();
             }
 
             CompletableFuture<? extends U> task;
@@ -194,8 +189,7 @@ public abstract class BindingMapping<T, U> extends ObjectBinding<U> {
         }
 
         private void valueUpdate(T currentPrev, U computed) {
-            lock.lock();
-            try {
+            synchronized (this) {
                 if (isComputing(currentPrev)) {
                     computing = false;
                     computingPrev = null;
@@ -203,20 +197,15 @@ public abstract class BindingMapping<T, U> extends ObjectBinding<U> {
                     value = computed;
                     initialized = true;
                 }
-            } finally {
-                lock.unlock();
             }
         }
 
         private void valueUpdateFailed(T currentPrev) {
-            lock.lock();
-            try {
+            synchronized (this) {
                 if (isComputing(currentPrev)) {
                     computing = false;
                     computingPrev = null;
                 }
-            } finally {
-                lock.unlock();
             }
         }
 
