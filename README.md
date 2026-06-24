@@ -1,7 +1,6 @@
 <p align="center">
-  <img src="assets/icon.png" alt="PAPI LAUNCHER Preview" width="700">
+  <img src="assets/icon.png" alt="PAPI Launcher" width="180">
 </p>
-
 
 #  PAPI LAUNCHER
 
