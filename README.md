@@ -1,4 +1,9 @@
-# 🎮 PAPI LAUNCHER
+<p align="center">
+  <img src="assets/icon.png" alt="PAPI LAUNCHER Preview" width="700">
+</p>
+
+
+#  PAPI LAUNCHER
 
 [![License](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Java](https://img.shields.io/badge/Java-11%2B-orange.svg)](https://adoptium.net/)
@@ -13,6 +18,8 @@
 
 This project was born from a simple but important need: **being able to play Minecraft without registering a Microsoft account first**.
 HMCL (Original)
+
+```bash
 │
 └── HMCL_offline (intermediate fork)
 │
@@ -20,7 +27,7 @@ HMCL (Original)
 │
 └── PAPI LAUNCHER (your fork)
 └── Based on HMCL_offline + new features
-
+````
 
 ### 🧬 The Original Change
 The intermediate fork `HMCL_offline` was based on one clear idea:  
@@ -81,17 +88,20 @@ Spanish, English, Chinese, Japanese, Russian, Ukrainian, and Traditional Chinese
 
 ## 📥 Downloads
 
-**Latest version: v1.0.0**
+**Latest version:** [v1.0.0](https://github.com/endersan17/papi-launcher/releases)
 
-| Platform          | File      | Download |
-|-------------------|-----------|----------|
-| Windows           | `.exe`    | [Download](assets/oficial/papi-launcher-1.0.0.exe) |
-| Linux / macOS     | `.sh`     | [Download](assets/oficial/papi-launcher-1.0.0.sh) |
-| Universal (Java)  | `.jar`    | [Download](assets/oficial/papi-launcher-1.0.0.jar) |
+⬇️ **Download the latest release here:**
 
-> **Note:** The `.jar` works on any OS with Java 11+ installed.
+→ **[Go to Releases Page](https://github.com/endersan17/papi-launcher/releases)**
 
-![Icons](assets/icon.png) ![Windows Logo](assets/Logo_Windows_11.webp)
+| Platform          | File Type     | Link |
+|-------------------|---------------|------|
+| Windows           | Installer     | [Download .exe](https://github.com/endersan17/papi-launcher/releases) |
+| Linux / macOS     | Script        | [Download .sh](https://github.com/endersan17/papi-launcher/releases) |
+| Universal         | Java JAR      | [Download .jar](https://github.com/endersan17/papi-launcher/releases) |
+
+> **Note:** The `.jar` version works on any operating system with Java 11 or higher.
+
 
 ---
 
@@ -100,18 +110,6 @@ Spanish, English, Chinese, Japanese, Russian, Ukrainian, and Traditional Chinese
 **Minimum:**
 - **Java:** 11 (minimum) / 17 (recommended) / 21 (ideal)
 - **OS:** Windows, Linux, macOS, FreeBSD
-- **Architecture:** x86-64, ARM64, RISC-V, LoongArch64
-
-**Main Dependencies:**
-Kotlin + Java, JavaFX + JFoenix, Gradle (Kotlin DSL), Gson, JNA, jsoup, nanohttpd, Discord RPC, etc.
-
----
-
-## 🏗️ Architecture
-
-1. **HMCLBoot** – Bootstrap loader + Java version check + splash screen
-2. **HMCLCore** – Authentication, downloads, game launching, mod management
-3. **HMCL** – Full JavaFX UI with themes and containers
 
 ---
 
@@ -122,24 +120,18 @@ git clone https://github.com/endersan17/papi-launcher.git
 cd papi-launcher
 ./gradlew build
 java -jar build/libs/papi-launcher-*.jar
+````
 
 📖 Quick Start
 
 Create Offline Account (always available)
 Download Minecraft → Choose version → Play
 Change Theme → Settings → Appearance
-Use Containers → Create new container → Add mods, resource packs, etc.
+Use Containers → Create new container → Add mods, etc.
 
 
 🤝 Contributing
-Contributions are welcome!
-
-Fork the project
-Create your feature branch (git checkout -b feature/AmazingFeature)
-Commit your changes (git commit -m 'Add some AmazingFeature')
-Push to the branch (git push origin feature/AmazingFeature)
-Open a Pull Request
-
+Contributions are welcome! Fork → Branch → Commit → Pull Request.
 
 👥 Community
 
@@ -153,12 +145,9 @@ GitHub: endersan17/papi-launcher
 endersan17 — Creator of PAPI LAUNCHER
 huanghongxun — Original creator of HMCL
 SoyStormy — Main contributor & beta tester
-All HMCL contributors
-Creator of HMCL_offline (the key offline change)
+Creator of HMCL_offline
 
 
 📄 License
-This project is licensed under the GNU General Public License v3.0 - see the LICENSE file for details.
-
-Made with ❤️ by endersan17
-<img src="assets/Apple-logo.png" alt="Apple"> <img src="assets/linux_logo.png" alt="Linux"> <img src="assets/java_logo.png" alt="Java">
+This project is licensed under the GNU General Public License v3.0.
+Made with by endersan17
