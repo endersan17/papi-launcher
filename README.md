@@ -123,7 +123,7 @@ cd papi-launcher
 java -jar build/libs/papi-launcher-*.jar
 ````
 
-📖 Quick Start
+## 📖 Quick Start
 
 Create Offline Account (always available)
 Download Minecraft → Choose version → Play
@@ -131,17 +131,17 @@ Change Theme → Settings → Appearance
 Use Containers → Create new container → Add mods, etc.
 
 
-🤝 Contributing
+## 🤝 Contributing
 Contributions are welcome! Fork → Branch → Commit → Pull Request.
 
-👥 Community
+## 👥 Community
 
 Discord: Join Server
 YouTube: @papilauncher
 GitHub: endersan17/papi-launcher
 
 
-📜 Credits
+## 📜 Credits
 
 endersan17 — Creator of PAPI LAUNCHER
 huanghongxun — Original creator of HMCL
@@ -149,6 +149,6 @@ SoyStormy — Main contributor & beta tester
 Creator of HMCL_offline
 
 
-📄 License
+## 📄 License
 This project is licensed under the GNU General Public License v3.0.
 Made with by endersan17
