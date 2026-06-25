@@ -2,8 +2,9 @@
   <img src="assets/icon.png" alt="PAPI Launcher" width="180">
 </p>
 <div align="center">
-   #  PAPI LAUNCHER
+   <h1>PAPI LAUNCHER</h1>
 </div>
+
 
 [![License](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Java](https://img.shields.io/badge/Java-11%2B-orange.svg)](https://adoptium.net/)
